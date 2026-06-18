@@ -1,0 +1,7 @@
+# ============================================================
+# chatbot/.htaccess
+# Blocks direct browser access to the chatbot engine files.
+# They are require_once'd internally — never hit directly.
+# ============================================================
+Order deny,allow
+Deny from all
