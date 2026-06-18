@@ -3,14 +3,14 @@
 // includes/chatbot-widget.php
 //
 // CORRECT USAGE — add this ONE line just before </body>
-// inside: /dashv10_fixed/public/includes/footer.php
+// inside: /dashv10_Fixed/public/includes/footer.php
 //
 //   <?php include dirname(__DIR__, 2) . '/includes/chatbot-widget.php'; 
 //
 // dirname(__DIR__, 2) goes up TWO levels from footer.php:
 //   footer.php  →  public/includes/
 //   level 1 up  →  public/
-//   level 2 up  →  dashv10_fixed/   ← correct root
+//   level 2 up  →  dashv10_Fixed/   ← correct root
 // ============================================================
 
 // Skip in admin/vendor areas

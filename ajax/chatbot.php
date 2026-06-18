@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // ajax/chatbot.php — Main Chatbot AJAX Endpoint (No OpenAI!)
-// Place in: /dashv10_fixed/ajax/chatbot.php
+// Place in: /dashv10_Fixed/ajax/chatbot.php
 // ============================================================
 define('IN_APP', true);
 // require_once __DIR__ . '/../config.php';

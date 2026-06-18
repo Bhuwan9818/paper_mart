@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // admin/chatbot.php — Chatbot Admin Panel
-// Place in: /dashv10_fixed/admin/chatbot.php
+// Place in: /dashv10_Fixed/admin/chatbot.php
 // ============================================================
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';

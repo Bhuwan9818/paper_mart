@@ -616,34 +616,54 @@ function uploadPTImgs(ptId,input){
   const fd=new FormData();
   toUpload.forEach(f=>fd.append('images[]',f));
   fd.append('csrf_token',document.querySelector('[name=csrf_token]').value);
+  console.log('[upload-debug] sending', toUpload.length, 'file(s) for pt', ptId, toUpload.map(f=>f.name+' ('+f.size+'b, '+f.type+')'));
   fetch(BASE+'/ajax/upload-product-images.php',{method:'POST',body:fd,credentials:'same-origin'})
-    .then(r=>r.text().then(text=>{
+    .then(r=>{
+      console.log('[upload-debug] http status', r.status, r.statusText);
+      return r.text();
+    })
+    .then(text=>{
+      console.log('[upload-debug] raw response body:', text);
       let data;
       try{ data=JSON.parse(text); }
-      catch(e){ throw new Error('Server returned an invalid response (check PHP error log).'); }
+      catch(e){ throw new Error('Server returned an invalid response (check PHP error log). Raw: '+text.slice(0,200)); }
       return data;
-    }))
+    })
     .then(data=>{
+      console.log('[upload-debug] parsed JSON:', data);
       // Remove the temporary local-preview placeholders for this batch.
       ptState[ptId].images=ptState[ptId].images.filter(img=>!localEntries.includes(img));
       localEntries.forEach(e=>URL.revokeObjectURL(e.url));
       if(data.ok && data.saved && data.saved.length){
-        data.saved.forEach((fn,i)=>ptState[ptId].images.push({filename:fn,url:data.urls[i]}));
+        data.saved.forEach((fn,i)=>{
+          console.log('[upload-debug] adding saved image', fn, '-> url:', data.urls[i]);
+          ptState[ptId].images.push({filename:fn,url:data.urls[i]});
+        });
       }
       if(!data.ok){
         st.textContent='❌ '+(data.msg||'Upload failed — please try again.');
         st.style.color='#ef4444';
+        console.warn('[upload-debug] server reported failure:', data.msg, data.errors);
       } else if(data.errors && data.errors.length){
         st.textContent='⚠️ '+data.errors.join(' | ');
         st.style.color='#f59e0b';
+        console.warn('[upload-debug] partial errors:', data.errors);
       } else {
         st.textContent='✅ Uploaded';
         st.style.color='#10b981';
         setTimeout(()=>{ if(st) st.textContent=''; },2000);
       }
+      console.log('[upload-debug] ptState images after merge:', JSON.stringify(ptState[ptId].images));
       renderPTCards();
+      setTimeout(()=>{
+        document.querySelectorAll('#ptimgs_'+ptId+' img').forEach(imgEl=>{
+          console.log('[upload-debug] thumb <img> src=', imgEl.src, 'naturalWidth=', imgEl.naturalWidth);
+          imgEl.addEventListener('error',()=>console.error('[upload-debug] IMAGE FAILED TO LOAD (404 or bad path):', imgEl.src));
+        });
+      },50);
     })
     .catch(e=>{
+      console.error('[upload-debug] caught error:', e);
       // Remove the temporary local-preview placeholders on failure too.
       ptState[ptId].images=ptState[ptId].images.filter(img=>!localEntries.includes(img));
       localEntries.forEach(entry=>URL.revokeObjectURL(entry.url));
