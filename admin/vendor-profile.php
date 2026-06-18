@@ -20,7 +20,7 @@ $stats = $pdo->prepare("SELECT
     (SELECT COUNT(*) FROM enquiries WHERE vendor_id=? AND status='new')      AS new_enquiries,
     (SELECT SUM(views) FROM products WHERE vendor_id=?)                      AS total_views
 ");
-$stats->execute([$vid,$vid,$vid,$vid,$vid)]);
+$stats->execute([$vid,$vid,$vid,$vid,$vid]);
 $stats = $stats->fetch();
 
 /* ── Recent products ───────────────────────────────────── */

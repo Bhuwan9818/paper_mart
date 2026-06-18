@@ -1,7 +1,13 @@
 <?php
 // ajax/upload-tds.php — Upload a TDS (Technical Data Sheet) PDF for a pricing row
+ob_start();
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
+
+ob_end_clean();
 header('Content-Type: application/json');
 
 if (!isLoggedIn() || !in_array($_SESSION['role'], ['vendor','admin'])) {

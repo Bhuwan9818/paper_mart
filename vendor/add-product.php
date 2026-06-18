@@ -536,7 +536,7 @@ function buildPTCard(pt,num){
   const attrRows=selAttrs.map(a=>{const as=s.attrs[a.id]||{on:false,values:[]};const vals=as.values;const chipHtml=vals.length?vals.map(v=>`<span class="v-chip">${esc(v)}<button type="button" class="v-rm" onclick="removeVal(${pt.id},${a.id},'${esc(v)}')">✕</button></span>`).join(''):`<span class="val-ph">Select values…</span>`;
     return`<div class="attr-map-row ${as.on?'':'disabled'}" id="amrow_${pt.id}_${a.id}"><input type="checkbox" class="attr-map-toggle" id="amchk_${pt.id}_${a.id}" ${as.on?'checked':''} onchange="toggleAttrOnPT(${pt.id},${a.id},this.checked)" onclick="event.stopPropagation()"><label class="attr-map-label" for="amchk_${pt.id}_${a.id}">${esc(a.name)}<span class="attr-map-unit">${a.unit?' ('+esc(a.unit)+')':''}</span></label><div class="val-select" style="position:relative"><div class="val-trigger ${as.on?'':'disabled'}" id="vtrig_${pt.id}_${a.id}" onclick="${as.on?`toggleValDD(${pt.id},${a.id},event)`:''}"><div class="val-chips" id="vchips_${pt.id}_${a.id}">${chipHtml}</div><span class="val-arrow">▼</span></div><div class="val-dd" id="vdd_${pt.id}_${a.id}" onclick="event.stopPropagation()"><input class="val-dd-search" placeholder="Search or type custom…" oninput="filterValOpts(${pt.id},${a.id},this.value)"><div id="vopts_${pt.id}_${a.id}">${renderValOpts(pt.id,a.id,a.options,vals)}</div><div class="val-add-row"><input class="val-add-inp" id="vcustom_${pt.id}_${a.id}" placeholder="Custom value…" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomVal(${pt.id},${a.id});}"><button type="button" class="btn btn-primary btn-xs" onclick="addCustomVal(${pt.id},${a.id})">＋</button></div></div></div></div>`;
   }).join('');
-  const imgThumbsHtml=(s.images||[]).map((img,i)=>`<div class="img-thumb"><img src="${esc(img.url)}" alt=""><button type="button" class="img-thumb-rm" onclick="removePTImg(${pt.id},${i})">✕</button></div>`).join('');
+  const imgThumbsHtml=(s.images||[]).map((img,i)=>`<div class="img-thumb"${img.uploading?' style="opacity:.55"':''}><img src="${esc(img.url)}" alt="">${img.uploading?'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;background:rgba(0,0,0,.25)">⏳</div>':''}<button type="button" class="img-thumb-rm" onclick="removePTImg(${pt.id},${i})">✕</button></div>`).join('');
   const imgCount=s.images.length;const imgFull=imgCount>=IMG_LIMIT;
   return`<div class="pt-map-card" id="ptcard_${pt.id}"><div class="pt-map-head"><div class="pt-map-num">${num}</div><div class="pt-map-title">${esc(pt.name)}</div><span style="font-size:12px;color:#6366f1;font-weight:600;margin-left:auto">${imgCount}/${IMG_LIMIT} images</span>${s.tds?'<span style="font-size:12px;color:#9d174d;margin-left:8px">📄 TDS</span>':''}</div><div class="pt-map-body"><div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📐 Attributes</div><div class="attr_grid">${attrRows||'<div class="ms-empty">No attributes selected. Go back to Step 2.</div>'}</div></div><div class="price_img_grid"><div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start"><div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">💰 Price Range (₹)</div><div class="price-pair"><span class="price-sym">₹</span><input type="number" class="price-inp" id="pmin_${pt.id}" placeholder="Min" min="0" step="0.01" value="${esc(s.price_min)}" oninput="ptState[${pt.id}].price_min=this.value"><span class="price-sym">—</span><span class="price-sym">₹</span><input type="number" class="price-inp" id="pmax_${pt.id}" placeholder="Max" min="0" step="0.01" value="${esc(s.price_max)}" oninput="ptState[${pt.id}].price_max=this.value"></div></div><div><div style="font-size:11px;font-weight:700;color:#9d174d;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📄 TDS Report</div>${s.tds?`<div style="display:flex;align-items:center;gap:7px;background:#fdf2f8;border:1.5px solid #f9a8d4;border-radius:8px;padding:6px 12px"><span>📄</span><span style="font-size:12px;font-weight:600;color:#9d174d;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.tdsName||s.tds)}</span><button type="button" onclick="removePTTds(${pt.id})" style="background:none;border:none;color:#f43f5e;cursor:pointer;font-size:12px;padding:0">✕</button></div>`:`<label class="tds-label"><input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="uploadPTTds(${pt.id},this)"><span style="font-size:16px">📤</span><div><div style="font-size:12px;font-weight:600;color:#9d174d">Upload TDS</div><div style="font-size:11px;color:#94a3b8">PDF·DOC·XLS·10MB</div></div></label>`}<div id="tds_status_${pt.id}" style="font-size:12px;min-height:14px;margin-top:4px;font-weight:600"></div></div></div><div><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🖼️ Images (min 1, max ${IMG_LIMIT})</div><div class="img-thumbs" id="ptimgs_${pt.id}">${imgThumbsHtml}</div>${imgFull?'':`<div class="img-drop-sm" style="margin-top:8px"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onchange="uploadPTImgs(${pt.id},this)"><div style="font-size:22px;margin-bottom:4px">📁</div><div style="font-size:12.5px;font-weight:600;color:var(--primary)">Click or drag images</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">JPG·PNG·WebP·5MB · ${IMG_LIMIT-imgCount} slot${IMG_LIMIT-imgCount!==1?'s':''} left</div></div>`}<div id="img_status_${pt.id}" style="font-size:12px;min-height:14px;margin-top:4px;font-weight:600;color:#f59e0b"></div></div></div>
       <div style="border-top:1.5px solid #e0e7ff;padding-top:16px;margin-top:4px">
@@ -572,10 +572,92 @@ function addCustomVal(ptId,attrId){const inp=document.getElementById('vcustom_'+
 function removeVal(ptId,attrId,val){const arr=ptState[ptId]?.attrs[attrId]?.values;if(!arr)return;const i=arr.indexOf(val);if(i>=0)arr.splice(i,1);syncValChips(ptId,attrId);const opt=document.querySelector(`#vopts_${ptId}_${attrId} [data-val="${CSS.escape(val)}"]`);if(opt){opt.classList.remove('sel');opt.querySelector('.val-chk').textContent='';}}
 function syncValChips(ptId,attrId){const vals=ptState[ptId]?.attrs[attrId]?.values||[];const chips=document.getElementById('vchips_'+ptId+'_'+attrId);if(!chips)return;chips.innerHTML=vals.length?vals.map(v=>`<span class="v-chip">${esc(v)}<button type="button" class="v-rm" onclick="removeVal(${ptId},${attrId},'${esc(v)}')">✕</button></span>`).join(''):'<span class="val-ph">Select values…</span>';}
 function filterValOpts(ptId,attrId,q){document.querySelectorAll(`#vopts_${ptId}_${attrId} .val-opt`).forEach(el=>{el.style.display=(el.dataset.val||'').toLowerCase().includes(q.toLowerCase())?'':'none';});}
-function uploadPTTds(ptId,input){const file=input.files[0];if(!file)return;const st=document.getElementById('tds_status_'+ptId);st.textContent='⏳ Uploading…';st.style.color='#f59e0b';const fd=new FormData();fd.append('tds',file);fd.append('csrf_token',document.querySelector('[name=csrf_token]').value);fetch(BASE+'/ajax/upload-tds.php',{method:'POST',body:fd}).then(r=>r.json()).then(data=>{if(data.ok){ptState[ptId].tds=data.filename;ptState[ptId].tdsName=data.name;st.textContent='';renderPTCards();}else{st.textContent='❌ '+(data.msg||'Failed');st.style.color='#ef4444';}}).catch(e=>{st.textContent='❌ '+e.message;st.style.color='#ef4444';});input.value='';}
+function uploadPTTds(ptId,input){
+  const file=input.files[0];
+  if(!file)return;
+  const st=document.getElementById('tds_status_'+ptId);
+  st.textContent='⏳ Uploading…';
+  st.style.color='#f59e0b';
+  const fd=new FormData();
+  fd.append('tds',file);
+  fd.append('csrf_token',document.querySelector('[name=csrf_token]').value);
+  fetch(BASE+'/ajax/upload-tds.php',{method:'POST',body:fd,credentials:'same-origin'})
+    .then(r=>r.text().then(text=>{
+      let data;
+      try{ data=JSON.parse(text); }
+      catch(e){ throw new Error('Server returned an invalid response (check PHP error log).'); }
+      return data;
+    }))
+    .then(data=>{
+      if(data.ok){ptState[ptId].tds=data.filename;ptState[ptId].tdsName=data.name;st.textContent='';renderPTCards();}
+      else{st.textContent='❌ '+(data.msg||'Failed');st.style.color='#ef4444';}
+    })
+    .catch(e=>{st.textContent='❌ '+e.message;st.style.color='#ef4444';});
+  input.value='';
+}
 function removePTTds(ptId){ptState[ptId].tds='';ptState[ptId].tdsName='';renderPTCards();}
-function uploadPTImgs(ptId,input){const files=Array.from(input.files);if(!files.length)return;const remaining=IMG_LIMIT-(ptState[ptId].images||[]).length;const toUpload=files.slice(0,remaining);if(!toUpload.length)return;const st=document.getElementById('img_status_'+ptId);st.textContent='⏳ Uploading '+toUpload.length+' image(s)…';st.style.color='#f59e0b';const fd=new FormData();toUpload.forEach(f=>fd.append('images[]',f));fd.append('csrf_token',document.querySelector('[name=csrf_token]').value);fetch(BASE+'/ajax/upload-product-images.php',{method:'POST',body:fd}).then(r=>r.json()).then(data=>{if(data.saved)data.saved.forEach((fn,i)=>ptState[ptId].images.push({filename:fn,url:data.urls[i]}));st.textContent=data.errors?.length?'⚠️ '+data.errors.join(' | '):'';renderPTCards();}).catch(e=>{st.textContent='❌ '+e.message;st.style.color='#ef4444';});input.value='';}
-function removePTImg(ptId,idx){ptState[ptId].images.splice(idx,1);renderPTCards();}
+function uploadPTImgs(ptId,input){
+  const files=Array.from(input.files);
+  if(!files.length)return;
+  const remaining=IMG_LIMIT-(ptState[ptId].images||[]).length;
+  const toUpload=files.slice(0,remaining);
+  if(!toUpload.length)return;
+  const st=document.getElementById('img_status_'+ptId);
+  st.textContent='⏳ Uploading '+toUpload.length+' image(s)…';
+  st.style.color='#f59e0b';
+  // Instant local preview so the user sees something immediately,
+  // even before the server round-trip completes. Each entry is marked
+  // uploading:true and swapped for the real server URL once saved
+  // (or removed if the upload fails).
+  const localEntries=toUpload.map(f=>({filename:null,url:URL.createObjectURL(f),uploading:true}));
+  localEntries.forEach(e=>ptState[ptId].images.push(e));
+  renderPTCards();
+  const fd=new FormData();
+  toUpload.forEach(f=>fd.append('images[]',f));
+  fd.append('csrf_token',document.querySelector('[name=csrf_token]').value);
+  fetch(BASE+'/ajax/upload-product-images.php',{method:'POST',body:fd,credentials:'same-origin'})
+    .then(r=>r.text().then(text=>{
+      let data;
+      try{ data=JSON.parse(text); }
+      catch(e){ throw new Error('Server returned an invalid response (check PHP error log).'); }
+      return data;
+    }))
+    .then(data=>{
+      // Remove the temporary local-preview placeholders for this batch.
+      ptState[ptId].images=ptState[ptId].images.filter(img=>!localEntries.includes(img));
+      localEntries.forEach(e=>URL.revokeObjectURL(e.url));
+      if(data.ok && data.saved && data.saved.length){
+        data.saved.forEach((fn,i)=>ptState[ptId].images.push({filename:fn,url:data.urls[i]}));
+      }
+      if(!data.ok){
+        st.textContent='❌ '+(data.msg||'Upload failed — please try again.');
+        st.style.color='#ef4444';
+      } else if(data.errors && data.errors.length){
+        st.textContent='⚠️ '+data.errors.join(' | ');
+        st.style.color='#f59e0b';
+      } else {
+        st.textContent='✅ Uploaded';
+        st.style.color='#10b981';
+        setTimeout(()=>{ if(st) st.textContent=''; },2000);
+      }
+      renderPTCards();
+    })
+    .catch(e=>{
+      // Remove the temporary local-preview placeholders on failure too.
+      ptState[ptId].images=ptState[ptId].images.filter(img=>!localEntries.includes(img));
+      localEntries.forEach(entry=>URL.revokeObjectURL(entry.url));
+      st.textContent='❌ '+e.message;
+      st.style.color='#ef4444';
+      renderPTCards();
+    });
+  input.value='';
+}
+function removePTImg(ptId,idx){
+  const img=ptState[ptId].images[idx];
+  if(img && img.uploading && img.url && img.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
+  ptState[ptId].images.splice(idx,1);
+  renderPTCards();
+}
 
 /* Step 4 */
 function buildReview(){
