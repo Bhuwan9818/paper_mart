@@ -85,60 +85,65 @@ section.compact{padding:40px 0}
 .dd-label{padding:6px 18px 3px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--n300);margin-top:4px}
 
 /* ── AD DISPLAY SECTION ──
-   The banner image IS the content here — no dark overlay, no big text
-   block competing with it. Height is driven by the image itself (real
-   <img>, not background-image) up to a sensible max so the page layout
-   stays predictable; search and CTA are small corner widgets that float
-   on top without ever dimming or obstructing the artwork. */
-.ad-stage{position:relative;overflow:hidden;background:var(--n900);line-height:0}
-.ad-slides{position:relative;width:100%}
+   The banner image is the actual ad and stays fully uncluttered — the
+   only UI on top is the permanent search card, anchored left, with a
+   subtle fade behind just that corner so it reads cleanly on any photo
+   without ever dimming the rest of the image. Navigation lives in a
+   minimal numbered progress bar along the bottom edge. */
+.ad-stage{position:relative;overflow:hidden;background:var(--n900)}
+.ad-slides{position:absolute;inset:0;width:100%;height:100%}
 .ad-slide{
-  display:block;width:100%;
-  max-height:480px;min-height:220px;
-  height:auto;object-fit:cover;object-position:center;
+  display:block;width:100%;height:100%;
+  object-fit:cover;object-position:center;
   position:absolute;inset:0;
   opacity:0;
   transition:opacity 900ms ease-in-out;
   will-change:opacity;
   backface-visibility:hidden;
 }
-.ad-slide.active{opacity:1;position:relative}
-.ad-slide:not(.active){position:absolute}
-@media(max-width:768px){ .ad-slide{max-height:280px;min-height:180px} }
+.ad-slide.active{opacity:1}
+.ad-stage-inner{position:relative;z-index:3;height:580px;display:flex;align-items:center}
+@media(max-width:900px){.ad-stage-inner{height:auto;min-height:420px;padding:28px 0;align-items:flex-start}}
 
-/* Small corner search — collapsed pill by default, expands into a panel */
-.ad-search-widget{position:absolute;top:16px;right:16px;z-index:4}
-.ad-search-toggle{display:flex;align-items:center;gap:7px;background:rgba(20,12,10,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);color:#fff;padding:9px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s ease}
-.ad-search-toggle:hover{background:rgba(20,12,10,.75)}
-.ad-search-panel{
-  position:absolute;top:calc(100% + 8px);right:0;width:260px;
-  background:#fff;border-radius:var(--r-lg);box-shadow:0 12px 32px rgba(0,0,0,.25);
-  padding:16px;opacity:0;visibility:hidden;transform:translateY(-6px);
-  transition:opacity .2s ease,transform .2s ease,visibility .2s ease;
+/* ── Permanent search card, anchored left — the only element on the ad ── */
+.ad-search-card{
+  position:relative;z-index:4;
+  background:#fff;border-radius:var(--r-lg);
+  box-shadow:0 24px 60px rgba(0,0,0,.35);
+  padding:28px 26px;width:340px;flex-shrink:0;
 }
-.ad-search-panel.open{opacity:1;visibility:visible;transform:translateY(0)}
-.ad-search-field{width:100%;padding:10px 12px;border:1.5px solid var(--n200);border-radius:var(--r-sm);background:var(--n50);color:var(--n900);font-size:13.5px;font-family:'DM Sans',sans-serif;margin-bottom:8px}
+.ad-search-card::before{
+  /* Soft dark fade hugging just the card's footprint, so the white card
+     stays readable on bright photos without darkening the rest of the ad */
+  content:'';position:absolute;z-index:-1;top:-40px;left:-40px;
+  width:calc(100% + 200px);height:calc(100% + 160px);
+  background:radial-gradient(ellipse at 30% 35%, rgba(10,5,4,.35) 0%, transparent 70%);
+  pointer-events:none;
+}
+.ad-search-card h3{font-family:'Poppins',sans-serif;font-size:20px;font-weight:700;color:var(--n900);margin-bottom:18px;letter-spacing:-.01em}
+.ad-search-field{width:100%;padding:12px 14px;border:1.5px solid var(--n200);border-radius:var(--r-sm);background:var(--n50);color:var(--n900);font-size:13.5px;font-family:'DM Sans',sans-serif;margin-bottom:10px}
 .ad-search-field:focus{outline:none;border-color:var(--brand-2)}
-.ad-search-submit{width:100%;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:var(--r-sm);font-size:13.5px;font-weight:700;cursor:pointer;transition:background .2s ease}
-.ad-search-submit:hover{background:var(--brand-2)}
-@media(max-width:560px){
-  .ad-search-toggle span{display:none}
-  .ad-search-toggle{padding:9px 12px}
-  .ad-search-panel{width:220px}
+.ad-search-submit{width:100%;padding:13px;background:var(--brand);color:#fff;border:none;border-radius:var(--r-sm);font-size:14.5px;font-weight:700;cursor:pointer;transition:background .2s ease,transform .15s ease;margin-top:2px;font-family:'DM Sans',sans-serif}
+.ad-search-submit:hover{background:var(--brand-2);transform:translateY(-1px)}
+.ad-search-advanced{display:block;text-align:center;margin-top:14px;font-size:12.5px;color:var(--n500);text-decoration:none;font-weight:600}
+.ad-search-advanced:hover{color:var(--brand-2)}
+@media(max-width:900px){.ad-search-card{width:100%;max-width:380px}.ad-search-card::before{display:none}}
+
+/* ── Numbered progress bar, bottom edge — "01 — 04" with a thin animated
+   fill line. Minimal, premium, doesn't compete with the ad imagery. ── */
+.ad-progress{position:absolute;left:0;right:0;bottom:0;z-index:4;background:linear-gradient(0deg, rgba(10,5,4,.55) 0%, rgba(10,5,4,0) 100%);padding-top:32px}
+.ad-progress-inner{display:flex;align-items:center;gap:14px;padding:0 0 18px}
+.ad-progress-num{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.02em;flex-shrink:0}
+.ad-progress-num:first-child{color:#fff}
+.ad-progress-track{flex:1;height:2px;background:rgba(255,255,255,.25);border-radius:2px;overflow:hidden;max-width:220px}
+.ad-progress-fill{height:100%;width:0;background:var(--accent);border-radius:2px}
+.ad-progress-btn{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease;flex-shrink:0}
+.ad-progress-btn:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5)}
+@media(max-width:600px){
+  .ad-progress{position:relative;background:rgba(10,5,4,.92);padding-top:0;margin-top:18px}
+  .ad-progress-inner{padding:14px 0}
+  .ad-progress-track{max-width:none}
 }
-
-/* Small optional CTA, bottom-left — only rendered if the banner has one */
-.ad-cta-wrap{position:absolute;bottom:16px;left:16px;z-index:4}
-.ad-cta-btn{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F0C060,#FFE5AD);color:#4A1009;padding:10px 20px;border-radius:100px;font-size:13.5px;font-weight:700;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.2);transition:transform .2s ease,box-shadow .2s ease}
-.ad-cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.28)}
-
-.ad-nav-btns{position:absolute;bottom:16px;right:16px;display:flex;gap:8px;z-index:4}
-.ad-nav-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(20,12,10,.5);backdrop-filter:blur(6px);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease}
-.ad-nav-btn:hover{background:rgba(20,12,10,.75)}
-.ad-dots{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:7px;z-index:4}
-.ad-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.45);border:none;cursor:pointer;transition:background-color .25s ease,width .25s ease;padding:0}
-.ad-dot.active{width:22px;border-radius:4px;background:var(--accent)}
-@media(max-width:600px){ .ad-cta-wrap{bottom:48px} .ad-dots{bottom:14px} }
 
 /* Fallback hero (shown only if zero banners are uploaded yet) — keeps the
    original gradient + headline so the homepage never looks broken while

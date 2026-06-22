@@ -30,13 +30,12 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       <?php endforeach; ?>
     </div>
 
-    <!-- Small corner search widget — collapsed to an icon button until clicked -->
-    <div class="ad-search-widget">
-      <button type="button" class="ad-search-toggle" id="ad-search-toggle" aria-label="Search products">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <span>Find Products</span>
-      </button>
-      <div class="ad-search-panel" id="ad-search-panel">
+    <div class="container ad-stage-inner">
+      <!-- Solid search card, permanently visible — the only UI element on
+           top of the ad. The rest of the image stays a pure, uncluttered
+           banner — that's the actual ad, it shouldn't compete with text. -->
+      <div class="ad-search-card">
+        <h3>Find Your Products</h3>
         <form action="<?= BASE_URL ?>/public/products.php" method="GET">
           <select name="industry" class="ad-search-field">
             <option value="">All Industries</option>
@@ -50,33 +49,30 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
               <option value="<?= $cat['id'] ?>"><?= sH($cat['name']) ?></option>
             <?php endforeach; ?>
           </select>
-          <input type="text" name="q" placeholder="Product, GSM, spec…" class="ad-search-field">
-          <button type="submit" class="ad-search-submit">Search →</button>
+          <input type="text" name="q" placeholder="Product, GSM, specification…" class="ad-search-field">
+          <button type="submit" class="ad-search-submit">Search Products</button>
         </form>
+        <a href="<?= BASE_URL ?>/public/products.php" class="ad-search-advanced">Browse All Categories →</a>
       </div>
     </div>
 
-    <!-- Small optional CTA button, bottom-left — only shown if this slide has one set -->
-    <div class="ad-cta-wrap" id="ad-cta-wrap">
-      <?php if (!empty($heroBanners[0]['button_text'])): ?>
-        <a href="<?= !empty($heroBanners[0]['link_url']) ? sH($heroBanners[0]['link_url']) : BASE_URL.'/public/products.php' ?>" class="ad-cta-btn" id="ad-cta-btn"><?= sH($heroBanners[0]['button_text']) ?></a>
-      <?php endif; ?>
-    </div>
-
     <?php if (count($heroBanners) > 1): ?>
-    <!-- Carousel controls -->
-    <div class="ad-nav-btns">
-      <button class="ad-nav-btn" id="hero-prev" aria-label="Previous banner">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      </button>
-      <button class="ad-nav-btn" id="hero-next" aria-label="Next banner">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-      </button>
-    </div>
-    <div class="ad-dots" id="hero-dots">
-      <?php foreach ($heroBanners as $i => $b): ?>
-        <button class="ad-dot <?= $i===0?'active':'' ?>" data-i="<?= $i ?>" aria-label="Go to slide <?= $i+1 ?>"></button>
-      <?php endforeach; ?>
+    <!-- Numbered progress bar — clean "01 — 04" counter with a thin
+         animated line that fills over each slide's autoplay duration -->
+    <div class="ad-progress" id="ad-progress">
+      <div class="container ad-progress-inner">
+        <span class="ad-progress-num" id="ad-progress-current">01</span>
+        <div class="ad-progress-track">
+          <div class="ad-progress-fill" id="ad-progress-fill"></div>
+        </div>
+        <span class="ad-progress-num ad-progress-total"><?= sprintf('%02d', count($heroBanners)) ?></span>
+        <button class="ad-progress-btn" id="hero-prev" aria-label="Previous banner">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <button class="ad-progress-btn" id="hero-next" aria-label="Next banner">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
     </div>
     <?php endif; ?>
 
@@ -110,32 +106,27 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 <?php if (count($heroBanners) > 1): ?>
 <script>
 (function(){
-  // Only the small corner CTA changes per-slide now — there's no title/
-  // subtitle overlay competing with the ad image anymore.
-  const slidesData = <?= json_encode(array_map(function($b) {
-    return [
-      'cta'  => $b['button_text'] ?: null,
-      'link' => $b['link_url'] ?: (BASE_URL.'/public/products.php'),
-    ];
-  }, $heroBanners), JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP) ?>;
+  const SLIDE_DURATION = 6000; // ms — also drives the progress bar fill speed
 
-  const slideEls = document.querySelectorAll('#hero-carousel .ad-slide');
-  const dots     = document.querySelectorAll('#hero-carousel .ad-dot');
-  const ctaWrap  = document.getElementById('ad-cta-wrap');
-  const prevBtn  = document.getElementById('hero-prev');
-  const nextBtn  = document.getElementById('hero-next');
+  const slideEls   = document.querySelectorAll('#hero-carousel .ad-slide');
+  const prevBtn     = document.getElementById('hero-prev');
+  const nextBtn     = document.getElementById('hero-next');
+  const currentNumEl = document.getElementById('ad-progress-current');
+  const fillEl      = document.getElementById('ad-progress-fill');
   let current = 0;
   let timer = null;
 
   function render(i){
     current = i;
     slideEls.forEach((el,idx)=>el.classList.toggle('active', idx===i));
-    dots.forEach((d,idx)=>d.classList.toggle('active', idx===i));
-    const d = slidesData[i];
-    if (ctaWrap) {
-      ctaWrap.innerHTML = d.cta
-        ? '<a href="'+d.link+'" class="ad-cta-btn" id="ad-cta-btn">'+d.cta+'</a>'
-        : '';
+    if (currentNumEl) currentNumEl.textContent = String(i+1).padStart(2,'0');
+    if (fillEl) {
+      // Restart the fill animation cleanly by forcing a reflow
+      fillEl.style.transition = 'none';
+      fillEl.style.width = '0%';
+      void fillEl.offsetWidth;
+      fillEl.style.transition = 'width '+SLIDE_DURATION+'ms linear';
+      fillEl.style.width = '100%';
     }
   }
 
@@ -144,15 +135,14 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 
   function startAutoplay(){
     clearInterval(timer);
-    timer = setInterval(next, 5500);
+    timer = setInterval(next, SLIDE_DURATION);
   }
 
   if (prevBtn) prevBtn.addEventListener('click', ()=>{ prev(); startAutoplay(); });
   if (nextBtn) nextBtn.addEventListener('click', ()=>{ next(); startAutoplay(); });
-  dots.forEach(d => d.addEventListener('click', ()=>{ render(parseInt(d.dataset.i,10)); startAutoplay(); }));
 
   const heroEl = document.getElementById('hero-carousel');
-  heroEl.addEventListener('mouseenter', ()=>clearInterval(timer));
+  heroEl.addEventListener('mouseenter', ()=>{ clearInterval(timer); if(fillEl) fillEl.style.animationPlayState='paused'; });
   heroEl.addEventListener('mouseleave', startAutoplay);
 
   // Swipe support on touch devices
@@ -163,26 +153,8 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
     if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); startAutoplay(); }
   }, {passive:true});
 
+  render(0);
   startAutoplay();
-})();
-</script>
-<?php endif; ?>
-
-<?php if ($heroBanners): ?>
-<script>
-(function(){
-  const toggle = document.getElementById('ad-search-toggle');
-  const panel  = document.getElementById('ad-search-panel');
-  if (!toggle || !panel) return;
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    panel.classList.toggle('open');
-  });
-  document.addEventListener('click', (e) => {
-    if (!panel.contains(e.target) && !toggle.contains(e.target)) {
-      panel.classList.remove('open');
-    }
-  });
 })();
 </script>
 <?php endif; ?>
