@@ -12,22 +12,55 @@ $totalProds  = $pdo->query("SELECT COUNT(*) FROM products WHERE status='active'"
 $totalVends  = $pdo->query("SELECT COUNT(*) FROM users WHERE role='vendor' AND status='active'")->fetchColumn();
 $totalEnqs   = $pdo->query("SELECT COUNT(*) FROM web_enquiries")->fetchColumn();
 $categories  = $pdo->query("SELECT c.*,i.name AS iname,(SELECT COUNT(*) FROM products WHERE category_id=c.id AND status='active') AS prod_count FROM categories c JOIN industries i ON i.id=c.industry_id WHERE c.status=1 ORDER BY prod_count DESC LIMIT 12")->fetchAll();
+try {
+    $heroBanners = $pdo->query("SELECT * FROM banners WHERE status='active' ORDER BY sort_order ASC, id ASC")->fetchAll();
+} catch (Exception $e) {
+    $heroBanners = []; // banners table not migrated yet — falls back to the plain gradient hero
+}
 
 $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'🗂️','Mono Carton'=>'🎁','Woven Fabric'=>'🧵','Non-Woven Fabric'=>'🎀','Industrial Adhesives'=>'🧴','Surface Coatings'=>'🖌️'];
 ?>
 
-<!-- HERO -->
-<section class="hero">
+<!-- HERO CAROUSEL -->
+<section class="hero" id="hero-carousel">
+  <?php if ($heroBanners): ?>
+  <div class="hero-slides" aria-hidden="true">
+    <?php foreach ($heroBanners as $i => $b): ?>
+      <img class="hero-slide <?= $i===0?'active':'' ?>" src="<?= sH(UPLOAD_URL.$b['image']) ?>" alt="" loading="<?= $i===0?'eager':'lazy' ?>" decoding="async">
+    <?php endforeach; ?>
+  </div>
+  <div class="hero-slide-overlay"></div>
+  <?php endif; ?>
+
   <div class="container">
     <div class="hero-grid">
       <div>
-        <div class="hero-label"><span class="hero-label-dot"></span>India's #1 B2B Paper Marketplace</div>
-        <h1 class="display-1">Source <em>Quality Paper</em> Directly from Manufacturers</h1>
-        <p class="hero-desc">Connect with verified suppliers of kraft paper, corrugated boxes, duplex board, and packaging materials. Get the best prices — no middlemen.</p>
-        <div class="hero-ctas">
-          <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-accent btn-lg">Browse Products</a>
-          <a href="<?= BASE_URL ?>/public/enquiry.php" class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)">Send Enquiry</a>
-        </div>
+        <?php if ($heroBanners): ?>
+          <!-- Text content swaps per-slide via JS; the first banner's title/subtitle render server-side for no-JS / first paint -->
+          <div class="hero-label" id="hero-label"><span class="hero-label-dot"></span>India's #1 B2B Paper Marketplace</div>
+          <h1 class="display-1" id="hero-dyn-title">
+            <?php if (!empty($heroBanners[0]['title'])): ?>
+              <?= sH($heroBanners[0]['title']) ?>
+            <?php else: ?>
+              Source <em>Quality Paper</em> Directly from Manufacturers
+            <?php endif; ?>
+          </h1>
+          <p class="hero-desc" id="hero-dyn-sub">
+            <?= sH($heroBanners[0]['subtitle'] ?: "Connect with verified suppliers of kraft paper, corrugated boxes, duplex board, and packaging materials. Get the best prices — no middlemen.") ?>
+          </p>
+          <div class="hero-ctas">
+            <a href="<?= !empty($heroBanners[0]['link_url']) ? sH($heroBanners[0]['link_url']) : BASE_URL.'/public/products.php' ?>" class="btn btn-accent btn-lg" id="hero-dyn-cta"><?= sH($heroBanners[0]['button_text'] ?: 'Browse Products') ?></a>
+            <a href="<?= BASE_URL ?>/public/enquiry.php" class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)">Send Enquiry</a>
+          </div>
+        <?php else: ?>
+          <div class="hero-label"><span class="hero-label-dot"></span>India's #1 B2B Paper Marketplace</div>
+          <h1 class="display-1">Source <em>Quality Paper</em> Directly from Manufacturers</h1>
+          <p class="hero-desc">Connect with verified suppliers of kraft paper, corrugated boxes, duplex board, and packaging materials. Get the best prices — no middlemen.</p>
+          <div class="hero-ctas">
+            <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-accent btn-lg">Browse Products</a>
+            <a href="<?= BASE_URL ?>/public/enquiry.php" class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)">Send Enquiry</a>
+          </div>
+        <?php endif; ?>
         <div class="hero-stats">
           <div class="hero-stat"><div class="hero-stat-n"><?= number_format($totalProds) ?>+</div><div class="hero-stat-l">Products Listed</div></div>
           <div class="hero-stat"><div class="hero-stat-n"><?= number_format($totalVends) ?>+</div><div class="hero-stat-l">Verified Vendors</div></div>
@@ -63,8 +96,89 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
         </div>
       </div>
     </div>
+
+    <?php if (count($heroBanners) > 1): ?>
+    <!-- Carousel controls -->
+    <div class="hero-nav-btns">
+      <button class="hero-nav-btn" id="hero-prev" aria-label="Previous banner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <button class="hero-nav-btn" id="hero-next" aria-label="Next banner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    </div>
+    <div class="hero-dots" id="hero-dots">
+      <?php foreach ($heroBanners as $i => $b): ?>
+        <button class="hero-dot <?= $i===0?'active':'' ?>" data-i="<?= $i ?>" aria-label="Go to slide <?= $i+1 ?>"></button>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
   </div>
 </section>
+
+<?php if (count($heroBanners) > 1): ?>
+<script>
+(function(){
+  // Banner content per slide, rendered server-side so there's zero risk
+  // of XSS via stored banner text — sH() escapes everything below.
+  const slidesData = <?= json_encode(array_map(function($b) {
+    return [
+      'title'   => $b['title']    ?: "Source Quality Paper Directly from Manufacturers",
+      'sub'     => $b['subtitle'] ?: "Connect with verified suppliers of kraft paper, corrugated boxes, duplex board, and packaging materials. Get the best prices — no middlemen.",
+      'cta'     => $b['button_text'] ?: 'Browse Products',
+      'link'    => $b['link_url'] ?: (BASE_URL.'/public/products.php'),
+    ];
+  }, $heroBanners), JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP) ?>;
+
+  const slideEls = document.querySelectorAll('#hero-carousel .hero-slide');
+  const dots     = document.querySelectorAll('#hero-carousel .hero-dot');
+  const titleEl  = document.getElementById('hero-dyn-title');
+  const subEl    = document.getElementById('hero-dyn-sub');
+  const ctaEl    = document.getElementById('hero-dyn-cta');
+  const prevBtn  = document.getElementById('hero-prev');
+  const nextBtn  = document.getElementById('hero-next');
+  let current = 0;
+  let timer = null;
+
+  function render(i){
+    current = i;
+    slideEls.forEach((el,idx)=>el.classList.toggle('active', idx===i));
+    dots.forEach((d,idx)=>d.classList.toggle('active', idx===i));
+    const d = slidesData[i];
+    if (titleEl) titleEl.textContent = d.title;
+    if (subEl)   subEl.textContent   = d.sub;
+    if (ctaEl)   { ctaEl.textContent = d.cta; ctaEl.href = d.link; }
+  }
+
+  function next(){ render((current+1) % slideEls.length); }
+  function prev(){ render((current-1+slideEls.length) % slideEls.length); }
+
+  function startAutoplay(){
+    clearInterval(timer);
+    timer = setInterval(next, 5500);
+  }
+
+  if (prevBtn) prevBtn.addEventListener('click', ()=>{ prev(); startAutoplay(); });
+  if (nextBtn) nextBtn.addEventListener('click', ()=>{ next(); startAutoplay(); });
+  dots.forEach(d => d.addEventListener('click', ()=>{ render(parseInt(d.dataset.i,10)); startAutoplay(); }));
+
+  // Pause on hover so users can read longer captions
+  const heroEl = document.getElementById('hero-carousel');
+  heroEl.addEventListener('mouseenter', ()=>clearInterval(timer));
+  heroEl.addEventListener('mouseleave', startAutoplay);
+
+  // Swipe support on touch devices
+  let startX = 0;
+  heroEl.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
+  heroEl.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); startAutoplay(); }
+  }, {passive:true});
+
+  startAutoplay();
+})();
+</script>
+<?php endif; ?>
 
 <!-- BROWSE CATEGORIES CAROUSEL -->
 <section class="cat-carousel-section">

@@ -42,6 +42,7 @@ $adminNav = [
     ['icon'=>'🏪','label'=>'Vendors',         'href'=>BASE_URL.'/admin/vendors.php',        'page'=>'vendors'],
     ['icon'=>'👥','label'=>'Customers',       'href'=>BASE_URL.'/admin/customers.php',      'page'=>'customers'],
     ['section'=>'Catalogue'],
+    ['icon'=>'🖼️','label'=>'Hero Banners',    'href'=>BASE_URL.'/admin/banners.php',       'page'=>'banners'],
     ['icon'=>'🏭','label'=>'Industries',      'href'=>BASE_URL.'/admin/industries.php',     'page'=>'industries'],
     ['icon'=>'🗂️','label'=>'Categories',      'href'=>BASE_URL.'/admin/categories.php',    'page'=>'categories'],
     ['icon'=>'🔖','label'=>'Product Types',   'href'=>BASE_URL.'/admin/product-types.php', 'page'=>'product-types'],
