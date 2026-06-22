@@ -84,70 +84,86 @@ section.compact{padding:40px 0}
 .nav-dropdown a:hover{background:var(--n50);color:var(--brand-2)}
 .dd-label{padding:6px 18px 3px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--n300);margin-top:4px}
 
-/* ── HERO ──
-   Fixed-height stage: the section's height is set explicitly and never
-   changes with slide count or caption length. Slides and the content
-   grid are both absolutely positioned inside this fixed box, so longer
-   titles/subtitles on some banners simply wrap or get vertically centered
-   within the same space — they never push the section taller. */
-.hero{
-  background:linear-gradient(330deg, #62130a 0%, var(--brand) 55%, #A8302A 100%);
-  position:relative;overflow:hidden;color:#fff;
-  height:560px;display:flex;align-items:center;
-}
-.hero::before{content:'';position:absolute;right:-80px;top:-80px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(139,36,29,.25) 0%,transparent 70%);pointer-events:none;z-index:1}
-.hero::after{content:'';position:absolute;left:-40px;bottom:-80px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(240,192,96,.12) 0%,transparent 70%);pointer-events:none;z-index:1}
-.hero .container{position:relative;z-index:2;width:100%}
-
-/* Carousel banner slides — real <img> elements (not background-image)
-   so the browser can composite the crossfade on the GPU. Only `opacity`
-   ever animates; nothing here triggers layout or paint on every frame,
-   which is what caused the lag in the background-image + scale version. */
-.hero-slides{position:absolute;inset:0;z-index:0;overflow:hidden}
-.hero-slide{
-  position:absolute;inset:0;width:100%;height:100%;
-  object-fit:cover;object-position:center;
+/* ── AD DISPLAY SECTION ──
+   The banner image IS the content here — no dark overlay, no big text
+   block competing with it. Height is driven by the image itself (real
+   <img>, not background-image) up to a sensible max so the page layout
+   stays predictable; search and CTA are small corner widgets that float
+   on top without ever dimming or obstructing the artwork. */
+.ad-stage{position:relative;overflow:hidden;background:var(--n900);line-height:0}
+.ad-slides{position:relative;width:100%}
+.ad-slide{
+  display:block;width:100%;
+  max-height:480px;min-height:220px;
+  height:auto;object-fit:cover;object-position:center;
+  position:absolute;inset:0;
   opacity:0;
   transition:opacity 900ms ease-in-out;
   will-change:opacity;
   backface-visibility:hidden;
 }
-.hero-slide.active{opacity:1}
-.hero-slide-overlay{position:absolute;inset:0;z-index:1;background:linear-gradient(330deg, rgba(98,19,10,.88) 0%, rgba(139,36,29,.82) 55%, rgba(168,48,42,.78) 100%)}
+.ad-slide.active{opacity:1;position:relative}
+.ad-slide:not(.active){position:absolute}
+@media(max-width:768px){ .ad-slide{max-height:280px;min-height:180px} }
 
-.hero-nav-btns{position:absolute;bottom:24px;right:24px;display:flex;gap:10px;z-index:3}
-.hero-nav-btn{width:42px;height:42px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);backdrop-filter:blur(6px);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease}
-.hero-nav-btn:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.5)}
-.hero-dots{position:absolute;bottom:30px;left:24px;display:flex;gap:8px;z-index:3}
-.hero-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.35);border:none;cursor:pointer;transition:background-color .25s ease,width .25s ease;padding:0}
-.hero-dot.active{width:26px;border-radius:4px;background:var(--accent)}
-@media(max-width:768px){
-  .hero{height:auto;min-height:620px;padding:36px 0}
-  .hero-nav-btns{display:none}
-  .hero-dots{left:50%;transform:translateX(-50%);bottom:14px}
+/* Small corner search — collapsed pill by default, expands into a panel */
+.ad-search-widget{position:absolute;top:16px;right:16px;z-index:4}
+.ad-search-toggle{display:flex;align-items:center;gap:7px;background:rgba(20,12,10,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);color:#fff;padding:9px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s ease}
+.ad-search-toggle:hover{background:rgba(20,12,10,.75)}
+.ad-search-panel{
+  position:absolute;top:calc(100% + 8px);right:0;width:260px;
+  background:#fff;border-radius:var(--r-lg);box-shadow:0 12px 32px rgba(0,0,0,.25);
+  padding:16px;opacity:0;visibility:hidden;transform:translateY(-6px);
+  transition:opacity .2s ease,transform .2s ease,visibility .2s ease;
 }
-.hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center;max-height:100%;overflow:hidden}
+.ad-search-panel.open{opacity:1;visibility:visible;transform:translateY(0)}
+.ad-search-field{width:100%;padding:10px 12px;border:1.5px solid var(--n200);border-radius:var(--r-sm);background:var(--n50);color:var(--n900);font-size:13.5px;font-family:'DM Sans',sans-serif;margin-bottom:8px}
+.ad-search-field:focus{outline:none;border-color:var(--brand-2)}
+.ad-search-submit{width:100%;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:var(--r-sm);font-size:13.5px;font-weight:700;cursor:pointer;transition:background .2s ease}
+.ad-search-submit:hover{background:var(--brand-2)}
+@media(max-width:560px){
+  .ad-search-toggle span{display:none}
+  .ad-search-toggle{padding:9px 12px}
+  .ad-search-panel{width:220px}
+}
+
+/* Small optional CTA, bottom-left — only rendered if the banner has one */
+.ad-cta-wrap{position:absolute;bottom:16px;left:16px;z-index:4}
+.ad-cta-btn{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F0C060,#FFE5AD);color:#4A1009;padding:10px 20px;border-radius:100px;font-size:13.5px;font-weight:700;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.2);transition:transform .2s ease,box-shadow .2s ease}
+.ad-cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.28)}
+
+.ad-nav-btns{position:absolute;bottom:16px;right:16px;display:flex;gap:8px;z-index:4}
+.ad-nav-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(20,12,10,.5);backdrop-filter:blur(6px);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease}
+.ad-nav-btn:hover{background:rgba(20,12,10,.75)}
+.ad-dots{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:7px;z-index:4}
+.ad-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.45);border:none;cursor:pointer;transition:background-color .25s ease,width .25s ease;padding:0}
+.ad-dot.active{width:22px;border-radius:4px;background:var(--accent)}
+@media(max-width:600px){ .ad-cta-wrap{bottom:48px} .ad-dots{bottom:14px} }
+
+/* Fallback hero (shown only if zero banners are uploaded yet) — keeps the
+   original gradient + headline so the homepage never looks broken while
+   the admin is still setting banners up. */
+.ad-stage-empty{
+  background:linear-gradient(330deg, #62130a 0%, var(--brand) 55%, #A8302A 100%);
+  padding:64px 0;color:#fff;text-align:center;
+}
+.ad-stage-empty .hero-label{justify-content:center;margin-inline:auto}
+.ad-stage-empty .hero-ctas{justify-content:center}
 .hero-label{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:100px;padding:5px 14px;font-size:12px;color:rgba(255,255,255,.8);margin-bottom:18px;font-weight:500}
 .hero-label-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
-.hero h1{font-size:clamp(2rem,4.5vw,3.4rem);font-weight:800;letter-spacing:-.03em;margin-bottom:18px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-.hero h1 em{color:#ffd279;font-style:normal}
-.hero-desc{color:rgba(255,255,255,.72);font-size:1.05rem;margin-bottom:30px;line-height:1.75;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-.hero-ctas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:36px}
-.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.hero-stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:var(--r);padding:18px;text-align:center}
-.hero-stat-n{font-family:'Poppins',sans-serif;font-size:26px;font-weight:800;color:#fff}
-.hero-stat-l{font-size:12px;color:rgba(255,255,255,.6);margin-top:3px}
-.hero-search-card{background:rgba(255,255,255,.1);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.15);border-radius:var(--r-lg);padding:24px}
-.hero-search-card h3{font-size:17px;margin-bottom:16px;color:#fff}
-.hero-field{width:100%;padding:12px 14px;border:1.5px solid rgba(255,255,255,.2);border-radius:var(--r-sm);background:rgba(255,255,255,.08);color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;margin-bottom:10px}
-.hero-field::placeholder,.hero-field option{color:rgba(255,255,255,.55)}
-.hero-field:focus{outline:none;border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.14)}
-.hero-field option{background:#1a3c5e}
-.hero-submit{width:100%;padding:13px;background:linear-gradient(135deg,#F0C060,#FFE5AD);color:#4A1009;border:none;border-radius:var(--r-sm);font-size:15px;font-weight:700;cursor:pointer;transition:var(--t);font-family:'DM Sans',sans-serif;margin-top:4px}
-.hero-submit:hover{background:linear-gradient(135deg,#FFE5AD,#F0C060);transform:translateY(-1px);box-shadow:0 4px 14px rgba(240,192,96,.4)}
-.hero-tags{margin-top:14px;display:flex;gap:7px;flex-wrap:wrap}
-.hero-tag{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.75);padding:4px 12px;border-radius:100px;font-size:12px;cursor:pointer;transition:var(--t)}
-.hero-tag:hover{background:rgba(255,255,255,.2);color:#fff}
+.display-1{font-size:clamp(2rem,4.5vw,3.4rem);font-weight:800;letter-spacing:-.03em;margin-bottom:18px}
+.display-1 em{color:#ffd279;font-style:normal}
+.hero-desc{color:rgba(255,255,255,.72);font-size:1.05rem;margin-bottom:30px;line-height:1.75;max-width:640px;margin-inline:auto}
+.hero-ctas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+
+/* Slim stats strip — sits below the ad display so figures never
+   compete visually with the banner artwork above. */
+.stats-strip{background:var(--brand-3);border-bottom:1px solid var(--n200);padding:20px 0}
+.stats-strip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:760px;margin-inline:auto}
+.stats-strip-item{text-align:center}
+.stats-strip-n{font-family:'Poppins',sans-serif;font-size:24px;font-weight:800;color:var(--brand-2)}
+.stats-strip-l{font-size:12.5px;color:var(--n500);margin-top:2px}
+@media(max-width:600px){.stats-strip-grid{gap:8px}.stats-strip-n{font-size:19px}}
 
 /* ── TRUST BAR ── */
 .trust-bar{background:var(--n50);border-bottom:1px solid var(--n200);padding:16px 0}
@@ -368,9 +384,9 @@ section.compact{padding:40px 0}
 .stars .empty{color:var(--n200)}
 
 /* Responsive */
-@media(max-width:1024px){.hero-grid{grid-template-columns:1fr}.products-layout{grid-template-columns:1fr}.filter-panel{position:static}.product-detail-layout{grid-template-columns:1fr}.footer-grid{grid-template-columns:1fr 1fr;gap:28px}}
-@media(max-width:768px){.header-top{display:none}.search-bar{max-width:100%}.header-actions .btn-hdr-outline{display:none}.hero-grid{gap:28px}.hero-stats{grid-template-columns:repeat(3,1fr)}.product-list-item{grid-template-columns:1fr}.pli-img{height:160px;aspect-ratio:auto}.pli-actions{flex-direction:row}.products-grid{grid-template-columns:repeat(2,1fr)}.compare-slots{display:none}.footer-grid{grid-template-columns:1fr;gap:24px}}
-@media(max-width:480px){.container{padding:0 14px}.hero h1{font-size:1.8rem}.hero-ctas{flex-direction:column}.products-grid{grid-template-columns:1fr}.hero-stats{grid-template-columns:1fr 1fr 1fr;gap:8px}.hero-stat{padding:12px 8px}.hero-stat-n{font-size:20px}}
+@media(max-width:1024px){.products-layout{grid-template-columns:1fr}.filter-panel{position:static}.product-detail-layout{grid-template-columns:1fr}.footer-grid{grid-template-columns:1fr 1fr;gap:28px}}
+@media(max-width:768px){.header-top{display:none}.search-bar{max-width:100%}.header-actions .btn-hdr-outline{display:none}.product-list-item{grid-template-columns:1fr}.pli-img{height:160px;aspect-ratio:auto}.pli-actions{flex-direction:row}.products-grid{grid-template-columns:repeat(2,1fr)}.compare-slots{display:none}.footer-grid{grid-template-columns:1fr;gap:24px}}
+@media(max-width:480px){.container{padding:0 14px}.display-1{font-size:1.8rem}.hero-ctas{flex-direction:column}.products-grid{grid-template-columns:1fr}}
 
 /* ============================================================
    RESPONSIVE NAV — Mobile & Tablet  (added v10)
@@ -866,7 +882,6 @@ section.compact{padding:40px 0}
 
   /* Hero */
   .hero { padding: 52px 0 40px; }
-  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
   .hero h1   { font-size: clamp(1.9rem,4vw,2.8rem); }
 
   /* Products layout */
@@ -908,15 +923,6 @@ section.compact{padding:40px 0}
   .hero-desc { font-size: .93rem; margin-bottom: 20px; }
   .hero-ctas { gap: 8px; margin-bottom: 22px; }
   .hero-ctas .btn-lg { padding: 11px 22px; font-size: 14px; }
-  .hero-stats { grid-template-columns: repeat(3,1fr); gap: 8px; }
-  .hero-stat  { padding: 10px 6px; }
-  .hero-stat-n { font-size: 19px; }
-  .hero-stat-l { font-size: 10.5px; }
-  .hero-search-card { padding: 16px; }
-  .hero-field  { padding: 10px 12px; font-size: 13.5px; margin-bottom: 8px; }
-  .hero-submit { padding: 11px; font-size: 14px; }
-  .hero-tags   { gap: 5px; }
-  .hero-tag    { padding: 3px 9px; font-size: 11.5px; }
 
   /* Trust bar */
   .trust-bar { padding: 10px 0; }
@@ -996,9 +1002,6 @@ section.compact{padding:40px 0}
 
   .hero { padding: 24px 0 20px; }
   .hero h1 { font-size: 1.5rem; }
-  .hero-stats { gap: 6px; }
-  .hero-stat-n { font-size: 17px; }
-  .hero-search-card { padding: 14px; }
 
   /* Products: 2 cols on most phones, 1 col only at 360 */
   .products-grid { grid-template-columns: repeat(2,1fr); gap: 8px; }
@@ -1023,8 +1026,6 @@ section.compact{padding:40px 0}
 /* ── ≤ 360px: very small ─────────────────────────────────── */
 @media (max-width:360px) {
   .products-grid { grid-template-columns: 1fr; }
-  .hero-stats { grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
-  .hero-stat-n { font-size: 15px; }
 }
 
 /* ── Inline grid overrides for public pages ──────────────── */
