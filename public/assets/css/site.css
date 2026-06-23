@@ -89,8 +89,15 @@ section.compact{padding:40px 0}
    only UI on top is the permanent search card, anchored left, with a
    subtle fade behind just that corner so it reads cleanly on any photo
    without ever dimming the rest of the image. Navigation lives in a
-   minimal numbered progress bar along the bottom edge. */
-.ad-stage{position:relative;overflow:hidden;background:var(--n900)}
+   minimal numbered progress bar along the bottom edge.
+
+   Responsive approach: the stage height uses clamp() so it scales
+   smoothly across every laptop width (a 1280px screen and a 1920px
+   screen both get a proportionate, never cramped or over-stretched,
+   banner) instead of jumping between a couple of fixed breakpoints.
+   Below 1024px (tablet and phone) the search card is removed entirely
+   — those screens show a pure, full ad image with just the progress bar. */
+.ad-stage{position:relative;overflow:hidden;background:var(--n900);width:100%}
 .ad-slides{position:absolute;inset:0;width:100%;height:100%}
 .ad-slide{
   display:block;width:100%;height:100%;
@@ -102,15 +109,20 @@ section.compact{padding:40px 0}
   backface-visibility:hidden;
 }
 .ad-slide.active{opacity:1}
-.ad-stage-inner{position:relative;z-index:3;height:580px;display:flex;align-items:center}
-@media(max-width:900px){.ad-stage-inner{height:auto;min-height:420px;padding:28px 0;align-items:flex-start}}
+.ad-stage-inner{
+  position:relative;z-index:3;
+  height:clamp(380px, 52vw, 580px);
+  display:flex;align-items:center;
+}
 
-/* ── Permanent search card, anchored left — the only element on the ad ── */
+/* ── Permanent search card, anchored left — desktop/laptop only ── */
 .ad-search-card{
   position:relative;z-index:4;
   background:#fff;border-radius:var(--r-lg);
   box-shadow:0 24px 60px rgba(0,0,0,.35);
-  padding:28px 26px;width:340px;flex-shrink:0;
+  padding:clamp(20px, 2.2vw, 28px) clamp(18px, 2vw, 26px);
+  width:clamp(280px, 26vw, 340px);
+  flex-shrink:0;
 }
 .ad-search-card::before{
   /* Soft dark fade hugging just the card's footprint, so the white card
@@ -120,29 +132,39 @@ section.compact{padding:40px 0}
   background:radial-gradient(ellipse at 30% 35%, rgba(10,5,4,.35) 0%, transparent 70%);
   pointer-events:none;
 }
-.ad-search-card h3{font-family:'Poppins',sans-serif;font-size:20px;font-weight:700;color:var(--n900);margin-bottom:18px;letter-spacing:-.01em}
-.ad-search-field{width:100%;padding:12px 14px;border:1.5px solid var(--n200);border-radius:var(--r-sm);background:var(--n50);color:var(--n900);font-size:13.5px;font-family:'DM Sans',sans-serif;margin-bottom:10px}
+.ad-search-card h3{font-family:'Poppins',sans-serif;font-size:clamp(17px,1.6vw,20px);font-weight:700;color:var(--n900);margin-bottom:16px;letter-spacing:-.01em}
+.ad-search-field{width:100%;padding:11px 14px;border:1.5px solid var(--n200);border-radius:var(--r-sm);background:var(--n50);color:var(--n900);font-size:13.5px;font-family:'DM Sans',sans-serif;margin-bottom:9px}
 .ad-search-field:focus{outline:none;border-color:var(--brand-2)}
-.ad-search-submit{width:100%;padding:13px;background:var(--brand);color:#fff;border:none;border-radius:var(--r-sm);font-size:14.5px;font-weight:700;cursor:pointer;transition:background .2s ease,transform .15s ease;margin-top:2px;font-family:'DM Sans',sans-serif}
+.ad-search-submit{width:100%;padding:12px;background:var(--brand);color:#fff;border:none;border-radius:var(--r-sm);font-size:14px;font-weight:700;cursor:pointer;transition:background .2s ease,transform .15s ease;margin-top:2px;font-family:'DM Sans',sans-serif}
 .ad-search-submit:hover{background:var(--brand-2);transform:translateY(-1px)}
-.ad-search-advanced{display:block;text-align:center;margin-top:14px;font-size:12.5px;color:var(--n500);text-decoration:none;font-weight:600}
+.ad-search-advanced{display:block;text-align:center;margin-top:13px;font-size:12.5px;color:var(--n500);text-decoration:none;font-weight:600}
 .ad-search-advanced:hover{color:var(--brand-2)}
-@media(max-width:900px){.ad-search-card{width:100%;max-width:380px}.ad-search-card::before{display:none}}
+
+/* Below tablet width: pure ad display only, no search card at all */
+@media(max-width:1024px){
+  .ad-search-card{display:none}
+  .ad-stage-inner{height:clamp(280px, 60vw, 420px)}
+}
 
 /* ── Numbered progress bar, bottom edge — "01 — 04" with a thin animated
    fill line. Minimal, premium, doesn't compete with the ad imagery. ── */
 .ad-progress{position:absolute;left:0;right:0;bottom:0;z-index:4;background:linear-gradient(0deg, rgba(10,5,4,.55) 0%, rgba(10,5,4,0) 100%);padding-top:32px}
-.ad-progress-inner{display:flex;align-items:center;gap:14px;padding:0 0 18px}
+.ad-progress-inner{display:flex;padding-bottom: 10px !important; align-items:center;gap:14px;padding:0 0 18px}
 .ad-progress-num{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.02em;flex-shrink:0}
 .ad-progress-num:first-child{color:#fff}
 .ad-progress-track{flex:1;height:2px;background:rgba(255,255,255,.25);border-radius:2px;overflow:hidden;max-width:220px}
 .ad-progress-fill{height:100%;width:0;background:var(--accent);border-radius:2px}
 .ad-progress-btn{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease;flex-shrink:0}
 .ad-progress-btn:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5)}
-@media(max-width:600px){
-  .ad-progress{position:relative;background:rgba(10,5,4,.92);padding-top:0;margin-top:18px}
-  .ad-progress-inner{padding:14px 0}
+@media(max-width:768px){
+  .ad-progress{padding-top:24px}
+  .ad-progress-inner{padding:0 0 14px;gap:10px}
   .ad-progress-track{max-width:none}
+  .ad-progress-btn{width:28px;height:28px}
+}
+@media(max-width:480px){
+  .ad-progress-num{font-size:11px}
+  .ad-progress-btn{width:26px;height:26px}
 }
 
 /* Fallback hero (shown only if zero banners are uploaded yet) — keeps the
@@ -150,7 +172,7 @@ section.compact{padding:40px 0}
    the admin is still setting banners up. */
 .ad-stage-empty{
   background:linear-gradient(330deg, #62130a 0%, var(--brand) 55%, #A8302A 100%);
-  padding:64px 0;color:#fff;text-align:center;
+  padding:clamp(40px,8vw,64px) 0;color:#fff;text-align:center;
 }
 .ad-stage-empty .hero-label{justify-content:center;margin-inline:auto}
 .ad-stage-empty .hero-ctas{justify-content:center}
@@ -163,7 +185,7 @@ section.compact{padding:40px 0}
 
 /* Slim stats strip — sits below the ad display so figures never
    compete visually with the banner artwork above. */
-.stats-strip{background:var(--brand-3);border-bottom:1px solid var(--n200);padding:20px 0}
+.stats-strip{background:var(--brand-3);display: none;  border-bottom:1px solid var(--n200);padding:20px 0}
 .stats-strip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:760px;margin-inline:auto}
 .stats-strip-item{text-align:center}
 .stats-strip-n{font-family:'Poppins',sans-serif;font-size:24px;font-weight:800;color:var(--brand-2)}
