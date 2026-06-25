@@ -184,17 +184,20 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
         $catGradients = [
           0 => ['#8B241D','#C0392B'],
         ];
-        $catBgPatterns=[
-          '📦'=>'cubic','📜'=>'waves','🗂️'=>'dots','🎁'=>'grid',
-          '🧵'=>'lines','🎀'=>'cross','🧴'=>'rings','🖌️'=>'brush',
-        ];
         foreach($categories as $idx=>$cat):
-          $icon=$catIcons[$cat['name']] ?? '📦';
+          $icon = $catIcons[$cat['name']] ?? ($cat['icon'] ?: '📦');
           $g = $catGradients[$idx % count($catGradients)];
+          $catImgs = array_values(array_filter(explode(',', $cat['images'] ?? '')));
+          $catPhoto = $catImgs[0] ?? null;
         ?>
-        <a href="<?= BASE_URL ?>/public/products.php?category=<?= $cat['id'] ?>" class="cat-card" style="--gc1:<?= $g[0] ?>;--gc2:<?= $g[1] ?>">
-          <div class="cat-card-bg"></div>
-          <div class="cat-card-shine"></div>
+        <a href="<?= BASE_URL ?>/public/products.php?category=<?= $cat['id'] ?>" class="cat-card <?= $catPhoto ? 'cat-card-photo' : '' ?>" style="--gc1:<?= $g[0] ?>;--gc2:<?= $g[1] ?>">
+          <?php if ($catPhoto): ?>
+            <img src="<?= sH(UPLOAD_URL.$catPhoto) ?>" alt="<?= sH($cat['name']) ?>" class="cat-card-img" loading="lazy">
+            <div class="cat-card-fade"></div>
+          <?php else: ?>
+            <div class="cat-card-bg"></div>
+            <div class="cat-card-shine"></div>
+          <?php endif; ?>
           <div class="cat-card-content">
             <div class="cat-card-icon-wrap">
               <span class="cat-card-icon"><?= $icon ?></span>
@@ -314,6 +317,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 .cat-card {
   flex-shrink: 0;
   width: 230px;
+  min-height: 230px;
   border-radius: 20px;
   padding: 26px 20px 22px;
   text-decoration: none;
@@ -329,6 +333,22 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 .cat-card:hover {
   transform: translateY(-6px) scale(1.02);
   box-shadow: 0 16px 40px rgba(0,0,0,.2), 0 4px 12px rgba(0,0,0,.1);
+}
+/* Photo-mode cards — a real category image fills the card, with a
+   bottom-up gradient fade so the name/count text stays legible on any
+   photo, without darkening the image as much as a flat overlay would. */
+.cat-card-photo { background: var(--n900); }
+.cat-card-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  transition: transform .4s cubic-bezier(.4,0,.2,1);
+}
+.cat-card-photo:hover .cat-card-img { transform: scale(1.08); }
+.cat-card-fade {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(20,8,6,.05) 0%, rgba(20,8,6,.35) 55%, rgba(20,8,6,.85) 100%);
+  pointer-events: none;
 }
 .cat-card-bg {
   position: absolute; inset: 0;
@@ -556,7 +576,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       <h2>How PaperMart Works</h2>
       <p>Connect with verified manufacturers in 3 easy steps — completely free for buyers.</p>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:36px" class="compare-group">
+    <div class="hiw-grid">
       <?php
       $steps=[
         ['🔍','Search & Discover','Browse thousands of paper products from verified manufacturers. Filter by GSM, grade, and specifications.'],
@@ -565,16 +585,56 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       ];
       foreach ($steps as $i=>[$icon,$title,$desc]):
       ?>
-      <div style="text-align:center;padding:32px 24px;border:1px solid var(--n200);border-radius:var(--r-lg);position:relative;transition:var(--t)" onmouseover="this.style.borderColor='var(--brand-2)';this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow)'" onmouseout="this.style.borderColor='var(--n200)';this.style.transform='none';this.style.boxShadow='none'">
-        <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;font-family:'Poppins',sans-serif;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center"><?= $i+1 ?></div>
-        <div style="font-size:44px;margin-bottom:16px"><?= $icon ?></div>
-        <h3 style="font-size:17px;margin-bottom:10px"><?= $title ?></h3>
-        <p style="font-size:13.5px;color:var(--n500);line-height:1.7"><?= $desc ?></p>
+      <div class="hiw-step">
+        <div class="hiw-step-num"><?= $i+1 ?></div>
+        <div class="hiw-step-icon"><?= $icon ?></div>
+        <h3><?= $title ?></h3>
+        <p><?= $desc ?></p>
       </div>
       <?php endforeach; ?>
     </div>
   </div>
 </section>
+
+<style>
+.hiw-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:36px;position:relative}
+.hiw-grid::before{
+  /* Connecting line between steps — desktop only, sits behind the icons */
+  content:'';position:absolute;top:68px;left:16.5%;right:16.5%;height:2px;
+  background:repeating-linear-gradient(90deg, var(--n200) 0 8px, transparent 8px 16px);
+  z-index:0;
+}
+.hiw-step{
+  text-align:center;padding:36px 26px 30px;
+  border:1px solid var(--n200);border-radius:var(--r-lg);
+  position:relative;background:#fff;z-index:1;
+  transition:border-color .25s ease,transform .25s ease,box-shadow .25s ease;
+}
+.hiw-step:hover{border-color:var(--brand-2);transform:translateY(-6px);box-shadow:var(--shadow)}
+.hiw-step-num{
+  position:absolute;top:-16px;left:50%;transform:translateX(-50%);
+  width:32px;height:32px;border-radius:50%;
+  background:var(--brand);color:#fff;
+  font-family:'Poppins',sans-serif;font-weight:800;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 12px rgba(139,36,29,.3);
+}
+.hiw-step-icon{
+  width:76px;height:76px;border-radius:50%;
+  background:linear-gradient(145deg,var(--brand-3),#fff5e6);
+  border:1.5px solid #f5deab;
+  display:flex;align-items:center;justify-content:center;
+  font-size:34px;margin:0 auto 20px;
+  transition:transform .3s ease;
+}
+.hiw-step:hover .hiw-step-icon{transform:scale(1.08) rotate(-4deg)}
+.hiw-step h3{font-size:17px;margin-bottom:10px;font-weight:700}
+.hiw-step p{font-size:13.5px;color:var(--n500);line-height:1.7;margin:0}
+@media(max-width:768px){
+  .hiw-grid{grid-template-columns:1fr;gap:24px}
+  .hiw-grid::before{display:none}
+}
+</style>
 
 <!-- LATEST PRODUCTS -->
 <?php if ($latest): ?>
@@ -621,16 +681,32 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 <?php endif; ?>
 
 <!-- CTA BANNER -->
-<section style="background:linear-gradient(135deg,var(--brand),#0f4c75);padding:56px 0">
-  <div class="container" style="text-align:center">
-    <h2 style="color:#fff;font-size:2rem;margin-bottom:12px">Are You a Paper Manufacturer?</h2>
-    <p style="color:rgba(255,255,255,.75);font-size:1.05rem;margin-bottom:28px;max-width:500px;margin-left:auto;margin-right:auto">List your products for free and connect with thousands of B2B buyers across India. Plans start at ₹0.</p>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+<section class="cta-banner">
+  <!-- Background photo goes here — drop a warehouse/factory image at
+       this path and it'll show through the gradient overlay below.
+       Until then, the gradient alone renders cleanly on its own. -->
+  <div class="cta-banner-bg" style="background-image:url('<?= BASE_URL ?>/public/assets/img/cta-warehouse.jpg')"></div>
+  <div class="cta-banner-overlay"></div>
+  <div class="container cta-banner-content">
+    <h2>Are You a Paper Manufacturer?</h2>
+    <p>List your products for free and connect with thousands of B2B buyers across India. Plans start at ₹0.</p>
+    <div class="cta-banner-actions">
       <a href="<?= BASE_URL ?>/public/vendor-register.php" class="btn btn-accent btn-lg">Start Listing Free</a>
       <a href="<?= BASE_URL ?>/vendor/subscription.php" class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)">View Plans</a>
     </div>
   </div>
 </section>
+
+<style>
+.cta-banner{position:relative;overflow:hidden;padding:64px 0;background:linear-gradient(135deg,var(--brand),#62130a)}
+.cta-banner-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.35}
+.cta-banner-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(98,19,10,.92),rgba(139,36,29,.88))}
+.cta-banner-content{position:relative;z-index:1;text-align:center}
+.cta-banner-content h2{color:#fff;font-size:clamp(1.6rem,3.5vw,2.1rem);margin-bottom:12px;font-weight:800}
+.cta-banner-content p{color:rgba(255,255,255,.78);font-size:1.05rem;margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6}
+.cta-banner-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+@media(max-width:480px){.cta-banner{padding:44px 0}}
+</style>
 
 <!-- ENQUIRY MODAL -->
 <div class="modal-backdrop" id="enquiry-modal">

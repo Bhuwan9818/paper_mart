@@ -149,7 +149,7 @@ section.compact{padding:40px 0}
 /* ── Numbered progress bar, bottom edge — "01 — 04" with a thin animated
    fill line. Minimal, premium, doesn't compete with the ad imagery. ── */
 .ad-progress{position:absolute;left:0;right:0;bottom:0;z-index:4;background:linear-gradient(0deg, rgba(10,5,4,.55) 0%, rgba(10,5,4,0) 100%);padding-top:32px}
-.ad-progress-inner{display:flex;padding-bottom: 10px !important; align-items:center;gap:14px;padding:0 0 18px}
+.ad-progress-inner{display:flex;align-items:center;gap:14px;padding:0 0 18px}
 .ad-progress-num{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.02em;flex-shrink:0}
 .ad-progress-num:first-child{color:#fff}
 .ad-progress-track{flex:1;height:2px;background:rgba(255,255,255,.25);border-radius:2px;overflow:hidden;max-width:220px}
@@ -185,7 +185,7 @@ section.compact{padding:40px 0}
 
 /* Slim stats strip — sits below the ad display so figures never
    compete visually with the banner artwork above. */
-.stats-strip{background:var(--brand-3);display: none;  border-bottom:1px solid var(--n200);padding:20px 0}
+.stats-strip{background:var(--brand-3);border-bottom:1px solid var(--n200);padding:20px 0}
 .stats-strip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:760px;margin-inline:auto}
 .stats-strip-item{text-align:center}
 .stats-strip-n{font-family:'Poppins',sans-serif;font-size:24px;font-weight:800;color:var(--brand-2)}
