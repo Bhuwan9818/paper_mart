@@ -148,7 +148,7 @@ section.compact{padding:40px 0}
 
 /* ── Numbered progress bar, bottom edge — "01 — 04" with a thin animated
    fill line. Minimal, premium, doesn't compete with the ad imagery. ── */
-.ad-progress{position:absolute;left:0;right:0;bottom:0;z-index:4;background:linear-gradient(0deg, rgba(10,5,4,.55) 0%, rgba(10,5,4,0) 100%);padding-top:32px}
+.ad-progress{position:absolute;left:0;right:0;bottom:0;z-index:4;background:linear-gradient(0deg, rgba(10,5,4,.55) 0%, rgba(10,5,4,0) 100%);padding:32px 0px 20px 0px}
 .ad-progress-inner{display:flex;align-items:center;gap:14px;padding:0 0 18px}
 .ad-progress-num{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.02em;flex-shrink:0}
 .ad-progress-num:first-child{color:#fff}
@@ -157,7 +157,7 @@ section.compact{padding:40px 0}
 .ad-progress-btn{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease;flex-shrink:0}
 .ad-progress-btn:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5)}
 @media(max-width:768px){
-  .ad-progress{padding-top:24px}
+  .ad-progress{padding:24px 0px}
   .ad-progress-inner{padding:0 0 14px;gap:10px}
   .ad-progress-track{max-width:none}
   .ad-progress-btn{width:28px;height:28px}
