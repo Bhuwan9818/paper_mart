@@ -297,6 +297,19 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 .cat-carousel-wrapper {
   overflow: hidden;
   border-radius: var(--r-lg);
+  position: relative;
+}
+.cat-carousel-wrapper::after {
+  /* Soft fade at the right edge hints there's more to scroll — a subtle
+     premium touch, desktop only (tablet/mobile use native scroll where
+     the peek effect already does this job). */
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 12px;
+  width: 64px;
+  background: linear-gradient(90deg, transparent, var(--n50) 85%);
+  pointer-events: none;
+  z-index: 2;
 }
 .cat-carousel-track {
   display: flex;
@@ -446,16 +459,54 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   background: var(--brand);
 }
 
-@media(max-width:768px){
-  .cat-card { width: 168px; padding: 22px 16px 18px; }
-  .cat-carousel-title { font-size: 1.5rem; }
+/* ── Tablet (1025px and below, down to 769px): smaller cards, native
+   scroll-snap carousel, arrow buttons hidden in favor of swipe/scroll ── */
+@media(max-width:1024px){
+  .cat-carousel-section { padding: 48px 0 40px; }
+  .cat-card { width: 200px; min-height: 210px; padding: 24px 18px 20px; }
   .cat-carousel-nav-btns { display: none; }
-  .cat-carousel-wrapper { overflow-x: auto; border-radius: 0; }
-  .cat-carousel-track { transition: none; padding: 8px 0 16px; }
-  .compare-group{
-    display:grid;
-    grid-template-columns: 1fr !important;
+  .cat-carousel-dots { display: none; } /* native scrollbar/snap replaces page dots */
+  .cat-carousel-wrapper::after { display: none; }
+  .cat-carousel-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-radius: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .cat-carousel-wrapper::-webkit-scrollbar { display: none; }
+  .cat-carousel-track {
+    transition: none;
+    scroll-snap-type: x mandatory;
+    /* Negative-margin + padding "peek" trick: the first/last card sit
+       flush with the container edge while still allowing a sliver of
+       the next card to peek in, signalling there's more to scroll. */
+    padding: 8px 24px 16px;
+    margin: 0 -24px;
+  }
+  .cat-card { scroll-snap-align: start; }
+}
+
+/* ── Mobile (768px and below): tighter cards, same scroll-snap system ── */
+@media(max-width:768px){
+  .cat-carousel-section { padding: 40px 0 32px; }
+  .cat-carousel-header { margin-bottom: 24px; }
+  .cat-carousel-title { font-size: 1.5rem; }
+  .cat-carousel-sub { font-size: 13px; }
+  .cat-card { width: 172px; min-height: 196px; padding: 20px 16px 16px; border-radius: 16px; }
+  .cat-card-icon-wrap { width: 46px; height: 46px; border-radius: 13px; margin-bottom: 14px; }
+  .cat-card-icon { font-size: 23px; }
+  .cat-card-name { font-size: 13.5px; }
+  .cat-card-industry { font-size: 10.5px; }
+  .cat-card-count { padding: 6px 10px; margin-bottom: 10px; }
+  .cat-card-count-num { font-size: 17px; }
+  .cat-card-count-lbl { font-size: 10px; }
+  .cat-card-arrow { width: 24px; height: 24px; }
+  .cat-carousel-track { padding: 6px 16px 14px; margin: 0 -16px; }
+}
+
+@media(max-width:480px){
+  .cat-card { width: 158px; min-height: 184px; }
 }
 </style>
 
@@ -465,18 +516,32 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   const prevBtn = document.getElementById('cat-prev');
   const nextBtn = document.getElementById('cat-next');
   const dotsEl  = document.getElementById('cat-dots');
+  const wrapper = track ? track.parentElement : null;
 
-  if(!track || !prevBtn || !nextBtn) return;
+  if(!track || !prevBtn || !nextBtn || !wrapper) return;
 
-  const cards     = track.querySelectorAll('.cat-card');
-  const gap       = 18;
-  let cardW       = 230 + gap;
-  const visible   = () => Math.max(1, Math.floor(track.parentElement.offsetWidth / cardW));
-  const maxIndex  = () => Math.max(0, cards.length - visible());
-  let current     = 0;
+  const cards = track.querySelectorAll('.cat-card');
+  const gap   = 18;
 
-  // Build dots
-  function buildDots() {
+  // Below this width the carousel switches to native horizontal scroll
+  // with scroll-snap (see CSS) — buttery-smooth touch scrolling, no JS
+  // fighting the browser for control. Above it, JS drives a transform-
+  // based "paged" carousel with arrow buttons + dots.
+  const MOBILE_BREAKPOINT = 768;
+  const isDesktopMode = () => window.innerWidth > MOBILE_BREAKPOINT;
+
+  let current = 0;
+
+  function cardWidth(){
+    // Read the actual rendered width of the first card rather than a
+    // hardcoded number, so this stays correct at every screen size.
+    const first = cards[0];
+    return first ? first.getBoundingClientRect().width + gap : 248;
+  }
+  function visible(){ return Math.max(1, Math.floor(wrapper.offsetWidth / cardWidth())); }
+  function maxIndex(){ return Math.max(0, cards.length - visible()); }
+
+  function buildDots(){
     dotsEl.innerHTML = '';
     const pages = maxIndex() + 1;
     for(let i = 0; i < pages; i++){
@@ -487,35 +552,46 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       dotsEl.appendChild(d);
     }
   }
-
   function updateDots(){
     dotsEl.querySelectorAll('.cat-dot').forEach((d,i) => d.classList.toggle('active', i === current));
   }
 
   function goTo(idx){
+    if (!isDesktopMode()) return; // native scroll handles mobile/tablet
     current = Math.max(0, Math.min(idx, maxIndex()));
-    track.style.transform = 'translateX(-' + (current * cardW) + 'px)';
+    track.style.transform = 'translateX(-' + (current * cardWidth()) + 'px)';
     prevBtn.disabled = current === 0;
     nextBtn.disabled = current >= maxIndex();
     updateDots();
   }
 
+  function enterDesktopMode(){
+    track.style.transform = 'translateX(0px)';
+    buildDots();
+    goTo(0);
+  }
+  function enterMobileMode(){
+    // Hand control fully back to native scrolling — clear any leftover
+    // JS transform so it can't conflict with touch/scroll position.
+    track.style.transform = 'none';
+    dotsEl.innerHTML = '';
+  }
+
   prevBtn.addEventListener('click', () => goTo(current - 1));
   nextBtn.addEventListener('click', () => goTo(current + 1));
 
-  // Recalculate on resize
-  window.addEventListener('resize', () => { cardW = 200 + gap; buildDots(); goTo(Math.min(current, maxIndex())); });
+  let wasDesktop = isDesktopMode();
+  if (wasDesktop) enterDesktopMode(); else enterMobileMode();
 
-  // Touch / swipe on mobile
-  let startX = 0;
-  track.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
-  track.addEventListener('touchend',   e => {
-    const dx = e.changedTouches[0].clientX - startX;
-    if(Math.abs(dx) > 40) dx < 0 ? goTo(current+1) : goTo(current-1);
-  }, {passive:true});
-
-  buildDots();
-  goTo(0);
+  window.addEventListener('resize', () => {
+    const nowDesktop = isDesktopMode();
+    if (nowDesktop !== wasDesktop) {
+      wasDesktop = nowDesktop;
+      nowDesktop ? enterDesktopMode() : enterMobileMode();
+    } else if (nowDesktop) {
+      goTo(Math.min(current, maxIndex()));
+    }
+  });
 })();
 </script>
 
