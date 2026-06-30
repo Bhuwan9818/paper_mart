@@ -84,113 +84,33 @@ section.compact{padding:40px 0}
 .nav-dropdown a:hover{background:var(--n50);color:var(--brand-2)}
 .dd-label{padding:6px 18px 3px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--n300);margin-top:4px}
 
-/* ── AD DISPLAY SECTION ──
-   The banner image is the actual ad and stays fully uncluttered — the
-   only UI on top is the permanent search card, anchored left, with a
-   subtle fade behind just that corner so it reads cleanly on any photo
-   without ever dimming the rest of the image. Navigation lives in a
-   minimal numbered progress bar along the bottom edge.
-
-   Responsive approach: the stage height uses clamp() so it scales
-   smoothly across every laptop width (a 1280px screen and a 1920px
-   screen both get a proportionate, never cramped or over-stretched,
-   banner) instead of jumping between a couple of fixed breakpoints.
-   Below 1024px (tablet and phone) the search card is removed entirely
-   — those screens show a pure, full ad image with just the progress bar. */
-.ad-stage{position:relative;overflow:hidden;background:var(--n900);width:100%}
-.ad-slides{position:absolute;inset:0;width:100%;height:100%}
-.ad-slide{
-  display:block;width:100%;height:100%;
-  object-fit:cover;object-position:center;
-  position:absolute;inset:0;
-  opacity:0;
-  transition:opacity 900ms ease-in-out;
-  will-change:opacity;
-  backface-visibility:hidden;
-}
-.ad-slide.active{opacity:1}
-.ad-stage-inner{
-  position:relative;z-index:3;
-  height:clamp(380px, 52vw, 580px);
-  display:flex;align-items:center;
-}
-
-/* ── Permanent search card, anchored left — desktop/laptop only ── */
-.ad-search-card{
-  position:relative;z-index:4;
-  background:#fff;border-radius:var(--r-lg);
-  box-shadow:0 24px 60px rgba(0,0,0,.35);
-  padding:clamp(20px, 2.2vw, 28px) clamp(18px, 2vw, 26px);
-  width:clamp(280px, 26vw, 340px);
-  flex-shrink:0;
-}
-.ad-search-card::before{
-  /* Soft dark fade hugging just the card's footprint, so the white card
-     stays readable on bright photos without darkening the rest of the ad */
-  content:'';position:absolute;z-index:-1;top:-40px;left:-40px;
-  width:calc(100% + 200px);height:calc(100% + 160px);
-  background:radial-gradient(ellipse at 30% 35%, rgba(10,5,4,.35) 0%, transparent 70%);
-  pointer-events:none;
-}
-.ad-search-card h3{font-family:'Poppins',sans-serif;font-size:clamp(17px,1.6vw,20px);font-weight:700;color:var(--n900);margin-bottom:16px;letter-spacing:-.01em}
-.ad-search-field{width:100%;padding:11px 14px;border:1.5px solid var(--n200);border-radius:var(--r-sm);background:var(--n50);color:var(--n900);font-size:13.5px;font-family:'DM Sans',sans-serif;margin-bottom:9px}
-.ad-search-field:focus{outline:none;border-color:var(--brand-2)}
-.ad-search-submit{width:100%;padding:12px;background:var(--brand);color:#fff;border:none;border-radius:var(--r-sm);font-size:14px;font-weight:700;cursor:pointer;transition:background .2s ease,transform .15s ease;margin-top:2px;font-family:'DM Sans',sans-serif}
-.ad-search-submit:hover{background:var(--brand-2);transform:translateY(-1px)}
-.ad-search-advanced{display:block;text-align:center;margin-top:13px;font-size:12.5px;color:var(--n500);text-decoration:none;font-weight:600}
-.ad-search-advanced:hover{color:var(--brand-2)}
-
-/* Below tablet width: pure ad display only, no search card at all */
-@media(max-width:1024px){
-  .ad-search-card{display:none}
-  .ad-stage-inner{height:clamp(280px, 60vw, 420px)}
-}
-
-/* ── Numbered progress bar, bottom edge — "01 — 04" with a thin animated
-   fill line. Minimal, premium, doesn't compete with the ad imagery. ── */
-.ad-progress{position:absolute;left:0;right:0;bottom:0;z-index:4;background:linear-gradient(0deg, rgba(10,5,4,.55) 0%, rgba(10,5,4,0) 100%);padding:32px 0px 20px 0px}
-.ad-progress-inner{display:flex;align-items:center;gap:14px;padding:0 0 18px}
-.ad-progress-num{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.02em;flex-shrink:0}
-.ad-progress-num:first-child{color:#fff}
-.ad-progress-track{flex:1;height:2px;background:rgba(255,255,255,.25);border-radius:2px;overflow:hidden;max-width:220px}
-.ad-progress-fill{height:100%;width:0;background:var(--accent);border-radius:2px}
-.ad-progress-btn{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease;flex-shrink:0}
-.ad-progress-btn:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5)}
-@media(max-width:768px){
-  .ad-progress{padding:24px 0px}
-  .ad-progress-inner{padding:0 0 14px;gap:10px}
-  .ad-progress-track{max-width:none}
-  .ad-progress-btn{width:28px;height:28px}
-}
-@media(max-width:480px){
-  .ad-progress-num{font-size:11px}
-  .ad-progress-btn{width:26px;height:26px}
-}
-
-/* Fallback hero (shown only if zero banners are uploaded yet) — keeps the
-   original gradient + headline so the homepage never looks broken while
-   the admin is still setting banners up. */
-.ad-stage-empty{
-  background:linear-gradient(330deg, #62130a 0%, var(--brand) 55%, #A8302A 100%);
-  padding:clamp(40px,8vw,64px) 0;color:#fff;text-align:center;
-}
-.ad-stage-empty .hero-label{justify-content:center;margin-inline:auto}
-.ad-stage-empty .hero-ctas{justify-content:center}
+/* ── HERO ── */
+.hero{background:linear-gradient(330deg, #62130a 0%, var(--brand) 55%, #A8302A 100%);padding:72px 0 60px;position:relative;overflow:hidden;color:#fff}
+.hero::before{content:'';position:absolute;right:-80px;top:-80px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(139,36,29,.25) 0%,transparent 70%);pointer-events:none}
+.hero::after{content:'';position:absolute;left:-40px;bottom:-80px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(240,192,96,.12) 0%,transparent 70%);pointer-events:none}
+.hero .container{position:relative;z-index:1}
+.hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
 .hero-label{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:100px;padding:5px 14px;font-size:12px;color:rgba(255,255,255,.8);margin-bottom:18px;font-weight:500}
 .hero-label-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
-.display-1{font-size:clamp(2rem,4.5vw,3.4rem);font-weight:800;letter-spacing:-.03em;margin-bottom:18px}
-.display-1 em{color:#ffd279;font-style:normal}
-.hero-desc{color:rgba(255,255,255,.72);font-size:1.05rem;margin-bottom:30px;line-height:1.75;max-width:640px;margin-inline:auto}
-.hero-ctas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
-
-/* Slim stats strip — sits below the ad display so figures never
-   compete visually with the banner artwork above. */
-.stats-strip{background:var(--brand-3);border-bottom:1px solid var(--n200);padding:20px 0}
-.stats-strip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:760px;margin-inline:auto}
-.stats-strip-item{text-align:center}
-.stats-strip-n{font-family:'Poppins',sans-serif;font-size:24px;font-weight:800;color:var(--brand-2)}
-.stats-strip-l{font-size:12.5px;color:var(--n500);margin-top:2px}
-@media(max-width:600px){.stats-strip-grid{gap:8px}.stats-strip-n{font-size:19px}}
+.hero h1{font-size:clamp(2rem,4.5vw,3.4rem);font-weight:800;letter-spacing:-.03em;margin-bottom:18px}
+.hero h1 em{color:#ffd279;font-style:normal}
+.hero-desc{color:rgba(255,255,255,.72);font-size:1.05rem;margin-bottom:30px;line-height:1.75}
+.hero-ctas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:36px}
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.hero-stat{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:var(--r);padding:18px;text-align:center}
+.hero-stat-n{font-family:'Poppins',sans-serif;font-size:26px;font-weight:800;color:#fff}
+.hero-stat-l{font-size:12px;color:rgba(255,255,255,.6);margin-top:3px}
+.hero-search-card{background:rgba(255,255,255,.1);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.15);border-radius:var(--r-lg);padding:24px}
+.hero-search-card h3{font-size:17px;margin-bottom:16px;color:#fff}
+.hero-field{width:100%;padding:12px 14px;border:1.5px solid rgba(255,255,255,.2);border-radius:var(--r-sm);background:rgba(255,255,255,.08);color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;margin-bottom:10px}
+.hero-field::placeholder,.hero-field option{color:rgba(255,255,255,.55)}
+.hero-field:focus{outline:none;border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.14)}
+.hero-field option{background:#1a3c5e}
+.hero-submit{width:100%;padding:13px;background:linear-gradient(135deg,#F0C060,#FFE5AD);color:#4A1009;border:none;border-radius:var(--r-sm);font-size:15px;font-weight:700;cursor:pointer;transition:var(--t);font-family:'DM Sans',sans-serif;margin-top:4px}
+.hero-submit:hover{background:linear-gradient(135deg,#FFE5AD,#F0C060);transform:translateY(-1px);box-shadow:0 4px 14px rgba(240,192,96,.4)}
+.hero-tags{margin-top:14px;display:flex;gap:7px;flex-wrap:wrap}
+.hero-tag{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.75);padding:4px 12px;border-radius:100px;font-size:12px;cursor:pointer;transition:var(--t)}
+.hero-tag:hover{background:rgba(255,255,255,.2);color:#fff}
 
 /* ── TRUST BAR ── */
 .trust-bar{background:var(--n50);border-bottom:1px solid var(--n200);padding:16px 0}
@@ -335,6 +255,12 @@ section.compact{padding:40px 0}
 .vc-stats{display:flex;gap:16px;margin:12px 0;font-size:12.5px;color:var(--n500)}
 .vc-stat strong{display:block;font-size:15px;font-weight:700;color:var(--n900)}
 
+/* Other Vendors tab — category-wise / product-wise subsections */
+.ov-subsection-head h3{font-size:16.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.ov-subsection-head p{font-size:13.5px;color:var(--n500);margin-bottom:4px;line-height:1.6}
+.ov-card-img{width:100%;height:120px;border-radius:var(--r-sm);overflow:hidden;margin-bottom:12px;background:var(--n50)}
+.ov-card-img img{width:100%;height:100%;object-fit:cover}
+
 /* ── COMPARE BAR ── */
 .compare-bar{position:fixed;bottom:0;left:0;right:0;z-index:850;background:var(--brand);color:#fff;padding:12px 0;transform:translateY(100%);transition:var(--t);box-shadow:0 -4px 20px rgba(0,0,0,.2)}
 .compare-bar.visible{transform:translateY(0)}
@@ -411,9 +337,9 @@ section.compact{padding:40px 0}
 .stars .empty{color:var(--n200)}
 
 /* Responsive */
-@media(max-width:1024px){.products-layout{grid-template-columns:1fr}.filter-panel{position:static}.product-detail-layout{grid-template-columns:1fr}.footer-grid{grid-template-columns:1fr 1fr;gap:28px}}
-@media(max-width:768px){.header-top{display:none}.search-bar{max-width:100%}.header-actions .btn-hdr-outline{display:none}.product-list-item{grid-template-columns:1fr}.pli-img{height:160px;aspect-ratio:auto}.pli-actions{flex-direction:row}.products-grid{grid-template-columns:repeat(2,1fr)}.compare-slots{display:none}.footer-grid{grid-template-columns:1fr;gap:24px}}
-@media(max-width:480px){.container{padding:0 14px}.display-1{font-size:1.8rem}.hero-ctas{flex-direction:column}.products-grid{grid-template-columns:1fr}}
+@media(max-width:1024px){.hero-grid{grid-template-columns:1fr}.products-layout{grid-template-columns:1fr}.filter-panel{position:static}.product-detail-layout{grid-template-columns:1fr}.footer-grid{grid-template-columns:1fr 1fr;gap:28px}}
+@media(max-width:768px){.header-top{display:none}.search-bar{max-width:100%}.header-actions .btn-hdr-outline{display:none}.hero{padding:40px 0}.hero-grid{gap:28px}.hero-stats{grid-template-columns:repeat(3,1fr)}.product-list-item{grid-template-columns:1fr}.pli-img{height:160px;aspect-ratio:auto}.pli-actions{flex-direction:row}.products-grid{grid-template-columns:repeat(2,1fr)}.compare-slots{display:none}.footer-grid{grid-template-columns:1fr;gap:24px}}
+@media(max-width:480px){.container{padding:0 14px}.hero h1{font-size:1.8rem}.hero-ctas{flex-direction:column}.products-grid{grid-template-columns:1fr}.hero-stats{grid-template-columns:1fr 1fr 1fr;gap:8px}.hero-stat{padding:12px 8px}.hero-stat-n{font-size:20px}}
 
 /* ============================================================
    RESPONSIVE NAV — Mobile & Tablet  (added v10)
@@ -909,6 +835,7 @@ section.compact{padding:40px 0}
 
   /* Hero */
   .hero { padding: 52px 0 40px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
   .hero h1   { font-size: clamp(1.9rem,4vw,2.8rem); }
 
   /* Products layout */
@@ -950,6 +877,15 @@ section.compact{padding:40px 0}
   .hero-desc { font-size: .93rem; margin-bottom: 20px; }
   .hero-ctas { gap: 8px; margin-bottom: 22px; }
   .hero-ctas .btn-lg { padding: 11px 22px; font-size: 14px; }
+  .hero-stats { grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .hero-stat  { padding: 10px 6px; }
+  .hero-stat-n { font-size: 19px; }
+  .hero-stat-l { font-size: 10.5px; }
+  .hero-search-card { padding: 16px; }
+  .hero-field  { padding: 10px 12px; font-size: 13.5px; margin-bottom: 8px; }
+  .hero-submit { padding: 11px; font-size: 14px; }
+  .hero-tags   { gap: 5px; }
+  .hero-tag    { padding: 3px 9px; font-size: 11.5px; }
 
   /* Trust bar */
   .trust-bar { padding: 10px 0; }
@@ -1029,6 +965,9 @@ section.compact{padding:40px 0}
 
   .hero { padding: 24px 0 20px; }
   .hero h1 { font-size: 1.5rem; }
+  .hero-stats { gap: 6px; }
+  .hero-stat-n { font-size: 17px; }
+  .hero-search-card { padding: 14px; }
 
   /* Products: 2 cols on most phones, 1 col only at 360 */
   .products-grid { grid-template-columns: repeat(2,1fr); gap: 8px; }
@@ -1053,6 +992,8 @@ section.compact{padding:40px 0}
 /* ── ≤ 360px: very small ─────────────────────────────────── */
 @media (max-width:360px) {
   .products-grid { grid-template-columns: 1fr; }
+  .hero-stats { grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .hero-stat-n { font-size: 15px; }
 }
 
 /* ── Inline grid overrides for public pages ──────────────── */

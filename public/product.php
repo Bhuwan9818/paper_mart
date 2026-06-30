@@ -13,8 +13,13 @@ $pdo->prepare("UPDATE products SET views=views+1 WHERE id=?")->execute([$p['id']
 $attrs=$pdo->prepare("SELECT * FROM product_attributes WHERE product_id=? ORDER BY sort_order");
 $attrs->execute([$p['id']]); $attrList=$attrs->fetchAll();
 
-// Other vendors selling same product type
-$otherVendors=getVendorsByProduct($pdo,$p['ptid'],$p['id']);
+// Other vendors — two distinct sections:
+// 1. Category-wise: any other active product in the same category
+// 2. Product-wise: exact same product (name + category + product type
+//    + every attribute value identical) sold by a different vendor
+$catVendors = getVendorsByCategory($pdo, $p['category_id'], $p['id'], $p['vendor_id']);
+$exactVendors = getVendorsByExactProduct($pdo, $p, $p['id'], $p['vendor_id']);
+$exactVendorCount = count($exactVendors) + 1; // +1 for the current vendor
 
 // Related products
 $related=$pdo->prepare("SELECT p2.*,u.name AS vname,u.company,vp.is_verified FROM products p2 JOIN users u ON u.id=p2.vendor_id LEFT JOIN vendor_profiles vp ON vp.vendor_id=p2.vendor_id WHERE p2.category_id=? AND p2.id!=? AND p2.status='active' ORDER BY p2.views DESC LIMIT 4");
@@ -77,8 +82,8 @@ $tdsFiles = array_values(array_unique($tdsFiles));
             <button class="tab-btn" onclick="switchTab('specs',this)">Specifications</button>
             <button class="tab-btn" onclick="switchTab('description',this)">Description</button>
             <button class="tab-btn" onclick="switchTab('vendor-info',this)">Vendor Info</button>
-            <?php if($otherVendors): ?>
-            <button class="tab-btn" onclick="switchTab('other-vendors',this)">Other Vendors <span style="background:var(--accent);color:#fff;border-radius:100px;padding:1px 7px;font-size:10px;margin-left:4px"><?= count($otherVendors) ?></span></button>
+            <?php if($catVendors || $exactVendors): ?>
+            <button class="tab-btn" onclick="switchTab('other-vendors',this)">Other Vendors <span style="background:var(--accent);color:#fff;border-radius:100px;padding:1px 7px;font-size:10px;margin-left:4px"><?= count($catVendors)+count($exactVendors) ?></span></button>
             <?php endif; ?>
           </div>
 
@@ -217,31 +222,74 @@ $tdsFiles = array_values(array_unique($tdsFiles));
             </div>
           </div>
 
-          <?php if($otherVendors): ?>
+          <?php if($catVendors || $exactVendors): ?>
           <div class="tab-panel" id="tab-other-vendors">
-            <p style="font-size:14px;color:var(--n500);margin-bottom:16px"><strong><?= count($otherVendors) ?></strong> other vendor(s) also sell similar <?= sH($p['tname']) ?>. Compare and choose the best one for your needs.</p>
-            <div class="vendor-cards">
-              <?php foreach($otherVendors as $ov):
-                $ovimgs=array_filter(explode(',',$ov['images']??''));
-                $ovimg=reset($ovimgs)?UPLOAD_URL.trim(reset($ovimgs)):'';
-              ?>
-              <div class="vendor-card">
-                <div class="vc-header">
-                  <div class="vc-logo"><?= strtoupper(substr($ov['vendor_name'],0,1)) ?></div>
-                  <div>
-                    <div class="vc-name"><?= sH($ov['company']?:$ov['vendor_name']) ?></div>
-                    <?php if($ov['is_verified']): ?><span class="badge badge-green" style="font-size:10px">✓ Verified</span><?php endif; ?>
+
+            <?php if($exactVendors): ?>
+            <div class="ov-subsection">
+              <div class="ov-subsection-head">
+                <h3>🎯 Same Product, Other Vendors</h3>
+                <p><strong><?= count($exactVendors) ?></strong> other vendor(s) sell this exact product — <?= sH($p['name']) ?> — with identical specifications. Compare prices and choose.</p>
+              </div>
+              <div class="vendor-cards">
+                <?php foreach($exactVendors as $ov):
+                  $ovimgs=array_filter(explode(',',$ov['images']??''));
+                  $ovimg=reset($ovimgs)?UPLOAD_URL.trim(reset($ovimgs)):'';
+                ?>
+                <div class="vendor-card">
+                  <div class="vc-header">
+                    <div class="vc-logo"><?= strtoupper(substr($ov['vendor_name'],0,1)) ?></div>
+                    <div>
+                      <div class="vc-name"><?= sH($ov['company']?:$ov['vendor_name']) ?></div>
+                      <?php if($ov['is_verified']): ?><span class="badge badge-green" style="font-size:10px">✓ Verified</span><?php endif; ?>
+                    </div>
+                  </div>
+                  <div style="font-size:13.5px;font-weight:700;color:var(--brand);margin-bottom:10px"><?= sH($ov['name']) ?></div>
+                  <?php if($ov['price_range']): ?><div style="font-size:13px;color:var(--n500);margin-bottom:10px">₹ <?= sH($ov['price_range']) ?></div><?php endif; ?>
+                  <div style="display:flex;gap:8px">
+                    <a href="<?= BASE_URL ?>/public/product.php?id=<?= $ov['id'] ?>" class="btn btn-outline btn-sm" style="flex:1">View Product</a>
+                    <button class="btn btn-accent btn-sm" onclick="openEnquiryModal(<?= $ov['id'] ?>,<?= $ov['vendor_id'] ?>,'<?= sH($ov['name']) ?>')">Enquire</button>
                   </div>
                 </div>
-                <div style="font-size:13.5px;font-weight:700;color:var(--brand);margin-bottom:10px"><?= sH($ov['name']) ?></div>
-                <?php if($ov['price_range']): ?><div style="font-size:13px;color:var(--n500);margin-bottom:10px">₹ <?= sH($ov['price_range']) ?></div><?php endif; ?>
-                <div style="display:flex;gap:8px">
-                  <a href="<?= BASE_URL ?>/public/product.php?id=<?= $ov['id'] ?>" class="btn btn-outline btn-sm" style="flex:1">View Product</a>
-                  <button class="btn btn-accent btn-sm" onclick="openEnquiryModal(<?= $ov['id'] ?>,<?= $ov['vendor_id'] ?>,'<?= sH($ov['name']) ?>')">Enquire</button>
-                </div>
+                <?php endforeach; ?>
               </div>
-              <?php endforeach; ?>
             </div>
+            <?php endif; ?>
+
+            <?php if($catVendors): ?>
+            <div class="ov-subsection" <?= $exactVendors ? 'style="margin-top:32px;padding-top:28px;border-top:1px solid var(--n200)"' : '' ?>>
+              <div class="ov-subsection-head">
+                <h3>🗂️ More from <?= sH($p['cname']) ?></h3>
+                <p><strong><?= count($catVendors) ?></strong> other product(s) from various vendors in this same category — browse alternatives and related options.</p>
+              </div>
+              <div class="vendor-cards">
+                <?php foreach($catVendors as $ov):
+                  $ovimgs=array_filter(explode(',',$ov['images']??''));
+                  $ovimg=reset($ovimgs)?UPLOAD_URL.trim(reset($ovimgs)):'';
+                ?>
+                <div class="vendor-card">
+                  <?php if($ovimg): ?>
+                  <div class="ov-card-img"><img src="<?= sH($ovimg) ?>" alt="<?= sH($ov['name']) ?>" loading="lazy"></div>
+                  <?php endif; ?>
+                  <div class="vc-header">
+                    <div class="vc-logo"><?= strtoupper(substr($ov['vendor_name'],0,1)) ?></div>
+                    <div>
+                      <div class="vc-name"><?= sH($ov['company']?:$ov['vendor_name']) ?></div>
+                      <?php if($ov['is_verified']): ?><span class="badge badge-green" style="font-size:10px">✓ Verified</span><?php endif; ?>
+                    </div>
+                  </div>
+                  <div style="font-size:13.5px;font-weight:700;color:var(--brand);margin-bottom:10px"><?= sH($ov['name']) ?></div>
+                  <?php if($ov['price_range']): ?><div style="font-size:13px;color:var(--n500);margin-bottom:10px">₹ <?= sH($ov['price_range']) ?></div><?php endif; ?>
+                  <div style="display:flex;gap:8px">
+                    <a href="<?= BASE_URL ?>/public/product.php?id=<?= $ov['id'] ?>" class="btn btn-outline btn-sm" style="flex:1">View Product</a>
+                    <button class="btn btn-accent btn-sm" onclick="openEnquiryModal(<?= $ov['id'] ?>,<?= $ov['vendor_id'] ?>,'<?= sH($ov['name']) ?>')">Enquire</button>
+                  </div>
+                </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+            <?php endif; ?>
+
           </div>
           <?php endif; ?>
         </div>
@@ -272,7 +320,7 @@ $tdsFiles = array_values(array_unique($tdsFiles));
         <div style="background:var(--n50);border:1px solid var(--n200);border-radius:var(--r-lg);padding:18px;margin-top:14px">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center">
             <div><div style="font-size:20px;font-weight:800;color:var(--brand)"><?= $p['views'] ?></div><div style="font-size:12px;color:var(--n500)">Total Views</div></div>
-            <div><div style="font-size:20px;font-weight:800;color:var(--brand)"><?= count($otherVendors)+1 ?></div><div style="font-size:12px;color:var(--n500)">Vendors Available</div></div>
+            <div><div style="font-size:20px;font-weight:800;color:var(--brand)"><?= $exactVendorCount ?></div><div style="font-size:12px;color:var(--n500)">Vendors Available</div></div>
           </div>
           <?php if($p['min_order_qty']): ?>
           <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--n200);font-size:13px;color:var(--n500)">

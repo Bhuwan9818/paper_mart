@@ -43,6 +43,96 @@ function getVendorsByProduct($pdo, $productTypeId, $excludeId=null) {
     return $stmt->fetchAll();
 }
 
+/**
+ * Category-wise other vendors: every other active product in the same
+ * category (one card per matching product, vendors can appear more than
+ * once if they have multiple listings in that category).
+ */
+function getVendorsByCategory($pdo, $categoryId, $excludeProductId, $excludeVendorId=null, $limit=8) {
+    $sql = "SELECT p.*, u.name AS vendor_name, u.company, u.phone, u.city, u.state,
+                   vp.is_verified, vp.logo, vp.tagline, vp.established_yr
+            FROM products p
+            JOIN users u ON u.id=p.vendor_id
+            LEFT JOIN vendor_profiles vp ON vp.vendor_id=p.vendor_id
+            WHERE p.category_id=? AND p.status='active' AND p.id!=?";
+    $params = [$categoryId, $excludeProductId];
+    if ($excludeVendorId) { $sql .= " AND p.vendor_id!=?"; $params[] = $excludeVendorId; }
+    $sql .= " ORDER BY vp.is_verified DESC, p.views DESC LIMIT " . (int)$limit;
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Product-wise other vendors: products from a DIFFERENT vendor that are
+ * an exact match on name + category + product type + every single
+ * attribute (name, value, and unit) — i.e. truly the same product
+ * listing, just sold by someone else.
+ *
+ * Matching is done by comparing attribute counts: a candidate product
+ * qualifies only if (a) it has the same number of attributes as the
+ * current product, and (b) every one of those attributes has an
+ * identical name+value+unit row also present on the current product.
+ * That two-sided count check rules out partial matches in either
+ * direction (extra attributes on either side, or any differing value).
+ */
+function getVendorsByExactProduct($pdo, $product, $excludeProductId, $excludeVendorId, $limit=8) {
+    // Build a normalized signature of the current product's attributes
+    $stmt = $pdo->prepare("SELECT attribute_name, attribute_value, attribute_unit FROM product_attributes WHERE product_id=?");
+    $stmt->execute([$excludeProductId]);
+    $myAttrs = $stmt->fetchAll();
+    $myAttrCount = count($myAttrs);
+
+    // Candidates: same name, category, product type, different vendor, active
+    $sql = "SELECT p.*, u.name AS vendor_name, u.company, u.phone, u.city, u.state,
+                   vp.is_verified, vp.logo, vp.tagline, vp.established_yr
+            FROM products p
+            JOIN users u ON u.id=p.vendor_id
+            LEFT JOIN vendor_profiles vp ON vp.vendor_id=p.vendor_id
+            WHERE p.name=? AND p.category_id=? AND p.product_type_id=?
+              AND p.status='active' AND p.id!=? AND p.vendor_id!=?
+            ORDER BY vp.is_verified DESC, p.views DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        $product['name'], $product['category_id'], $product['product_type_id'],
+        $excludeProductId, $excludeVendorId,
+    ]);
+    $candidates = $stmt->fetchAll();
+
+    if (!$candidates) return [];
+
+    // Pre-build a comparable set of "name|value|unit" strings for the
+    // current product, so each candidate's attributes can be checked
+    // without re-querying per row.
+    $mySignature = [];
+    foreach ($myAttrs as $a) {
+        $key = strtolower(trim($a['attribute_name'])) . '|' . strtolower(trim((string)$a['attribute_value'])) . '|' . strtolower(trim((string)$a['attribute_unit']));
+        $mySignature[$key] = true;
+    }
+
+    $exactMatches = [];
+    foreach ($candidates as $cand) {
+        $cStmt = $pdo->prepare("SELECT attribute_name, attribute_value, attribute_unit FROM product_attributes WHERE product_id=?");
+        $cStmt->execute([$cand['id']]);
+        $candAttrs = $cStmt->fetchAll();
+
+        // Must have exactly the same number of attributes — rules out a
+        // candidate with extra or missing attributes vs. the original.
+        if (count($candAttrs) !== $myAttrCount) continue;
+
+        $allMatch = true;
+        foreach ($candAttrs as $a) {
+            $key = strtolower(trim($a['attribute_name'])) . '|' . strtolower(trim((string)$a['attribute_value'])) . '|' . strtolower(trim((string)$a['attribute_unit']));
+            if (!isset($mySignature[$key])) { $allMatch = false; break; }
+        }
+        if ($allMatch) {
+            $exactMatches[] = $cand;
+            if (count($exactMatches) >= $limit) break;
+        }
+    }
+    return $exactMatches;
+}
+
 function getCompareList($pdo) {
     $key = session_id();
     try {
