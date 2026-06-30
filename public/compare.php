@@ -40,7 +40,7 @@ $industries = $pdo->query("SELECT id, name FROM industries WHERE status=1 ORDER 
         <p style="color:var(--n500);margin-top:6px">Compare specifications, prices, and vendors to make the best decision.</p>
       </div>
       <?php if ($products): ?>
-      <button class="btn btn-outline btn-sm" onclick="clearCompare()">✕ Clear All</button>
+      <button class="btn btn-outline btn-sm" onclick="clearComparePage()">✕ Clear All</button>
       <?php endif; ?>
     </div>
 
@@ -77,7 +77,7 @@ $industries = $pdo->query("SELECT id, name FROM industries WHERE status=1 ORDER 
               <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" style="font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:var(--n900);display:block;margin-bottom:5px"><?= sH($p['name']) ?></a>
               <div style="font-size:12px;color:var(--n500);margin-bottom:8px"><?= sH($p['cname']) ?></div>
               <button class="btn btn-accent btn-sm btn-full" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">📩 Enquire</button>
-              <button class="btn btn-outline btn-sm btn-full" style="margin-top:6px" onclick="removeFromCompare(<?= $p['id'] ?>)">Remove</button>
+              <button class="btn btn-outline btn-sm btn-full" style="margin-top:6px" onclick="removeFromComparePage(<?= $p['id'] ?>)">Remove</button>
             </th>
             <?php endforeach; ?>
             <?php if(count($products)<4): ?>
@@ -216,6 +216,34 @@ $industries = $pdo->query("SELECT id, name FROM industries WHERE status=1 ORDER 
 </div>
 
 <script>
+// This page's own Remove / Clear All buttons use these local versions
+// instead of the global ones in footer.php. The global functions only
+// refresh the floating compare bar (used site-wide), but on this page
+// the actual comparison table is server-rendered — so after a
+// successful add/remove/clear, the page needs to reload to reflect the
+// change immediately rather than waiting for a manual refresh.
+function removeFromComparePage(productId){
+  fetch(BASE+'/public/ajax/compare.php', {
+    method: 'POST',
+    headers: {'Content-Type':'application/x-www-form-urlencoded'},
+    body: 'action=remove&product_id=' + encodeURIComponent(productId)
+  })
+    .then(r => r.json())
+    .then(d => { if (d.ok) window.location.reload(); else alert(d.msg || 'Could not remove this product.'); })
+    .catch(() => alert('Something went wrong. Please try again.'));
+}
+function clearComparePage(){
+  if (!confirm('Remove all products from comparison?')) return;
+  fetch(BASE+'/public/ajax/compare.php', {
+    method: 'POST',
+    headers: {'Content-Type':'application/x-www-form-urlencoded'},
+    body: 'action=clear'
+  })
+    .then(r => r.json())
+    .then(d => { if (d.ok) window.location.reload(); })
+    .catch(() => alert('Something went wrong. Please try again.'));
+}
+
 function openEnquiryModal(pid,vid,name){document.getElementById('enq-product-id').value=pid;document.getElementById('enq-vendor-id').value=vid;document.getElementById('enq-product-name').textContent='📦 '+name;document.getElementById('enq-success').style.display='none';document.getElementById('enq-form').style.display='block';document.getElementById('enq-btn').textContent='Send Enquiry';document.getElementById('enq-btn').disabled=false;document.getElementById('enquiry-modal').classList.add('open');}
 function closeEnquiryModal(){document.getElementById('enquiry-modal').classList.remove('open');}
 document.getElementById('enquiry-modal').addEventListener('click',function(e){if(e.target===this)closeEnquiryModal();});
