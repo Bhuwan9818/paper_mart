@@ -112,7 +112,159 @@ section.compact{padding:40px 0}
 .hero-tag{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.75);padding:4px 12px;border-radius:100px;font-size:12px;cursor:pointer;transition:var(--t)}
 .hero-tag:hover{background:rgba(255,255,255,.2);color:#fff}
 
-/* ── TRUST BAR ── */
+/* ── AD DISPLAY SECTION (hero banner carousel) ─────────────────────────
+   The banner image IS the content — search and caption sit on top as
+   deliberate, solid UI elements. The section uses real <img> tags
+   (not background-image) so the browser composites crossfades on the
+   GPU via opacity only — no repaints, no scale animations.
+   Height is fluid via clamp() so every laptop width renders correctly
+   without fixed-pixel jumps. Below 1024px the search card is hidden
+   entirely — those screens get a pure, full-bleed ad image. ────────── */
+
+/* Stage */
+.ad-stage{position:relative;overflow:hidden;background:var(--n900);width:100%}
+
+/* Slides: real <img> elements, absolutely stacked, crossfade via opacity only */
+.ad-slides{position:absolute;inset:0;width:100%;height:100%}
+.ad-slide{
+  display:block;width:100%;height:100%;
+  object-fit:cover;object-position:center;
+  position:absolute;inset:0;
+  opacity:0;
+  transition:opacity 900ms ease-in-out;
+  will-change:opacity;
+  backface-visibility:hidden;
+}
+.ad-slide.active{opacity:1}
+
+/* Inner content layer: sits above slides, drives section height */
+.ad-stage-inner{
+  position:relative;z-index:3;
+  height:clamp(380px,52vw,580px);
+  display:flex;align-items:center;
+}
+
+/* ── Search card — desktop/laptop, left-anchored ── */
+.ad-search-card{
+  position:relative;z-index:4;
+  background:#fff;
+  border-radius:var(--r-lg);
+  box-shadow:0 24px 60px rgba(0,0,0,.35);
+  padding:clamp(20px,2.2vw,28px) clamp(18px,2vw,26px);
+  width:clamp(280px,26vw,340px);
+  flex-shrink:0;
+}
+/* Soft dark radial fade behind the card only — keeps text readable
+   on bright photos without dimming the rest of the ad */
+.ad-search-card::before{
+  content:'';position:absolute;z-index:-1;
+  top:-40px;left:-40px;
+  width:calc(100% + 200px);height:calc(100% + 160px);
+  background:radial-gradient(ellipse at 30% 35%,rgba(10,5,4,.38) 0%,transparent 70%);
+  pointer-events:none;
+}
+.ad-search-card h3{
+  font-family:'Poppins',sans-serif;font-size:clamp(17px,1.6vw,20px);
+  font-weight:700;color:var(--n900);margin-bottom:16px;letter-spacing:-.01em;
+}
+.ad-search-field{
+  width:100%;padding:11px 14px;
+  border:1.5px solid var(--n200);border-radius:var(--r-sm);
+  background:var(--n50);color:var(--n900);
+  font-size:13.5px;font-family:'DM Sans',sans-serif;
+  margin-bottom:9px;
+}
+.ad-search-field:focus{outline:none;border-color:var(--brand-2)}
+.ad-search-submit{
+  width:100%;padding:12px;
+  background:var(--brand);color:#fff;border:none;
+  border-radius:var(--r-sm);font-size:14px;font-weight:700;
+  cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:2px;
+  transition:background .2s ease,transform .15s ease;
+}
+.ad-search-submit:hover{background:var(--brand-2);transform:translateY(-1px)}
+.ad-search-advanced{
+  display:block;text-align:center;margin-top:13px;
+  font-size:12.5px;color:var(--n500);text-decoration:none;font-weight:600;
+}
+.ad-search-advanced:hover{color:var(--brand-2)}
+
+/* ── Numbered progress bar — bottom edge ── */
+.ad-progress{
+  position:absolute;left:0;right:0;bottom:0;z-index:4;
+  background:linear-gradient(0deg,rgba(10,5,4,.55) 0%,rgba(10,5,4,0) 100%);
+  padding-top:32px;
+}
+.ad-progress-inner{display:flex;align-items:center;gap:14px;padding:0 0 18px}
+.ad-progress-num{
+  font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;
+  color:rgba(255,255,255,.55);letter-spacing:.02em;flex-shrink:0;
+}
+.ad-progress-num:first-child{color:#fff}
+.ad-progress-track{
+  flex:1;height:2px;max-width:220px;
+  background:rgba(255,255,255,.25);border-radius:2px;overflow:hidden;
+}
+.ad-progress-fill{height:100%;width:0;background:var(--accent);border-radius:2px}
+.ad-progress-btn{
+  width:32px;height:32px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);
+  color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .2s ease,border-color .2s ease;flex-shrink:0;
+}
+.ad-progress-btn:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5)}
+
+/* ── Fallback hero (zero banners uploaded yet) ── */
+.ad-stage-empty{
+  background:linear-gradient(330deg,#62130a 0%,var(--brand) 55%,#A8302A 100%);
+  padding:clamp(40px,8vw,64px) 0;color:#fff;text-align:center;
+}
+.ad-stage-empty .hero-label{justify-content:center;margin-inline:auto}
+.ad-stage-empty .hero-ctas{justify-content:center}
+
+/* ── Stats strip below the ad section ── */
+.stats-strip{background:var(--brand-3);border-bottom:1px solid var(--n200);padding:20px 0}
+.stats-strip-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+  max-width:760px;margin-inline:auto;
+}
+.stats-strip-item{text-align:center}
+.stats-strip-n{font-family:'Poppins',sans-serif;font-size:24px;font-weight:800;color:var(--brand-2)}
+.stats-strip-l{font-size:12.5px;color:var(--n500);margin-top:2px}
+
+/* ── CTA banner (below fold) ── */
+.cta-banner{position:relative;overflow:hidden;padding:clamp(40px,8vw,64px) 0;background:linear-gradient(135deg,var(--brand),#62130a)}
+.cta-banner-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.35}
+.cta-banner-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(98,19,10,.92),rgba(139,36,29,.88))}
+.cta-banner-content{position:relative;z-index:1;text-align:center}
+.cta-banner-content h2{color:#fff;font-size:clamp(1.6rem,3.5vw,2.1rem);margin-bottom:12px;font-weight:800}
+.cta-banner-content p{color:rgba(255,255,255,.78);font-size:1.05rem;margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6}
+.cta-banner-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+/* ── Other Vendors tab subsections ── */
+.ov-subsection-head h3{font-size:16.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.ov-subsection-head p{font-size:13.5px;color:var(--n500);margin-bottom:4px;line-height:1.6}
+.ov-card-img{width:100%;height:120px;border-radius:var(--r-sm);overflow:hidden;margin-bottom:12px;background:var(--n50)}
+.ov-card-img img{width:100%;height:100%;object-fit:cover}
+
+/* ── Responsive ── */
+@media(max-width:1024px){
+  .ad-search-card{display:none}
+  .ad-stage-inner{height:clamp(280px,60vw,420px)}
+}
+@media(max-width:768px){
+  .ad-progress{padding-top:24px}
+  .ad-progress-inner{padding:0 0 14px;gap:10px}
+  .ad-progress-track{max-width:none}
+  .ad-progress-btn{width:28px;height:28px}
+  .stats-strip-n{font-size:19px}
+}
+@media(max-width:480px){
+  .ad-progress-num{font-size:11px}
+  .ad-progress-btn{width:26px;height:26px}
+}
+
+
 .trust-bar{background:var(--n50);border-bottom:1px solid var(--n200);padding:16px 0}
 .trust-items{display:flex;align-items:center;justify-content:space-around;gap:16px;flex-wrap:wrap}
 .trust-item{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;color:var(--n700);white-space:nowrap}

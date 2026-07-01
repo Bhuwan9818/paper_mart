@@ -22,7 +22,16 @@ foreach($products as $p){
 $allAttrNames=array_keys($allAttrNames);
 
 // Industries for the "Add Product" picker (industry → category → product type → product)
-$industries = $pdo->query("SELECT id, name FROM industries WHERE status=1 ORDER BY sort_order, name")->fetchAll();
+// Only industries that currently have at least one active product —
+// otherwise a buyer could pick an industry and hit a dead end further
+// down the chain.
+$industries = $pdo->query(
+    "SELECT DISTINCT i.id, i.name
+     FROM industries i
+     JOIN products p ON p.industry_id = i.id AND p.status = 'active'
+     WHERE i.status = 1
+     ORDER BY i.sort_order, i.name"
+)->fetchAll();
 ?>
 
 <div style="background:var(--n50);padding:14px 0;border-bottom:1px solid var(--n200)">
@@ -285,7 +294,7 @@ function apOnIndustryChange(){
   const industryId = document.getElementById('ap-industry').value;
   if (!industryId) return;
 
-  fetch(BASE + '/ajax/get-categories.php?industry_id=' + industryId)
+  fetch(BASE + '/public/ajax/get-categories-with-products.php?industry_id=' + industryId)
     .then(r => r.json())
     .then(list => {
       const sel = document.getElementById('ap-category');
@@ -306,7 +315,7 @@ function apOnCategoryChange(){
   const categoryId = document.getElementById('ap-category').value;
   if (!categoryId) return;
 
-  fetch(BASE + '/ajax/get-product-types.php?category_id=' + categoryId)
+  fetch(BASE + '/public/ajax/get-product-types-with-products.php?category_id=' + categoryId)
     .then(r => r.json())
     .then(list => {
       const sel = document.getElementById('ap-type');
@@ -330,7 +339,7 @@ function apOnTypeChange(){
     .then(r => r.json())
     .then(list => {
       const sel = document.getElementById('ap-product');
-      if (!list.length) { sel.innerHTML = '<option value="">No products available</option>'; return; }
+      if (!list.length) { sel.innerHTML = '<option value="">All products of this type are already in your comparison</option>'; return; }
       sel.innerHTML = '<option value="">Select Product…</option>' +
         list.map(p => {
           const label = p.name + (p.company || p.vendor_name ? ' — ' + (p.company || p.vendor_name) : '');

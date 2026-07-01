@@ -12,28 +12,29 @@ $totalProds  = $pdo->query("SELECT COUNT(*) FROM products WHERE status='active'"
 $totalVends  = $pdo->query("SELECT COUNT(*) FROM users WHERE role='vendor' AND status='active'")->fetchColumn();
 $totalEnqs   = $pdo->query("SELECT COUNT(*) FROM web_enquiries")->fetchColumn();
 $categories  = $pdo->query("SELECT c.*,i.name AS iname,(SELECT COUNT(*) FROM products WHERE category_id=c.id AND status='active') AS prod_count FROM categories c JOIN industries i ON i.id=c.industry_id WHERE c.status=1 ORDER BY prod_count DESC LIMIT 12")->fetchAll();
+
+// Active banners for the hero ad carousel
 try {
     $heroBanners = $pdo->query("SELECT * FROM banners WHERE status='active' ORDER BY sort_order ASC, id ASC")->fetchAll();
 } catch (Exception $e) {
-    $heroBanners = []; // banners table not migrated yet — falls back to the plain gradient hero
+    $heroBanners = []; // banners table not yet migrated — falls back to plain hero
 }
 
 $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'🗂️','Mono Carton'=>'🎁','Woven Fabric'=>'🧵','Non-Woven Fabric'=>'🎀','Industrial Adhesives'=>'🧴','Surface Coatings'=>'🖌️'];
 ?>
 
-<!-- AD DISPLAY SECTION (hero banner carousel) -->
+<!-- AD DISPLAY SECTION -->
 <section class="ad-stage" id="hero-carousel">
   <?php if ($heroBanners): ?>
     <div class="ad-slides" aria-hidden="true">
       <?php foreach ($heroBanners as $i => $b): ?>
-        <img class="ad-slide <?= $i===0?'active':'' ?>" src="<?= sH(UPLOAD_URL.$b['image']) ?>" alt="<?= sH($b['title'] ?: 'Promotional banner') ?>" loading="<?= $i===0?'eager':'lazy' ?>" decoding="async">
+        <img class="ad-slide <?= $i===0?'active':'' ?>"
+             src="<?= sH(UPLOAD_URL.$b['image']) ?>"
+             alt="<?= sH($b['title'] ?: 'Promotional banner') ?>"
+             loading="<?= $i===0?'eager':'lazy' ?>" decoding="async">
       <?php endforeach; ?>
     </div>
-
     <div class="container ad-stage-inner">
-      <!-- Solid search card, permanently visible — the only UI element on
-           top of the ad. The rest of the image stays a pure, uncluttered
-           banner — that's the actual ad, it shouldn't compete with text. -->
       <div class="ad-search-card">
         <h3>Find Your Products</h3>
         <form action="<?= BASE_URL ?>/public/products.php" method="GET">
@@ -55,16 +56,11 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
         <a href="<?= BASE_URL ?>/public/products.php" class="ad-search-advanced">Browse All Categories →</a>
       </div>
     </div>
-
     <?php if (count($heroBanners) > 1): ?>
-    <!-- Numbered progress bar — clean "01 — 04" counter with a thin
-         animated line that fills over each slide's autoplay duration -->
     <div class="ad-progress" id="ad-progress">
       <div class="container ad-progress-inner">
         <span class="ad-progress-num" id="ad-progress-current">01</span>
-        <div class="ad-progress-track">
-          <div class="ad-progress-fill" id="ad-progress-fill"></div>
-        </div>
+        <div class="ad-progress-track"><div class="ad-progress-fill" id="ad-progress-fill"></div></div>
         <span class="ad-progress-num ad-progress-total"><?= sprintf('%02d', count($heroBanners)) ?></span>
         <button class="ad-progress-btn" id="hero-prev" aria-label="Previous banner">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -75,13 +71,11 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       </div>
     </div>
     <?php endif; ?>
-
   <?php else: ?>
-    <!-- No banners uploaded yet — graceful fallback so the homepage never looks broken -->
     <div class="ad-stage-empty">
       <div class="container">
         <div class="hero-label"><span class="hero-label-dot"></span>India's #1 B2B Paper Marketplace</div>
-        <h1 class="display-1">Source <em>Quality Paper</em> Directly from Manufacturers</h1>
+        <h1>Source <em>Quality Paper</em> Directly from Manufacturers</h1>
         <p class="hero-desc">Connect with verified suppliers of kraft paper, corrugated boxes, duplex board, and packaging materials. Get the best prices — no middlemen.</p>
         <div class="hero-ctas">
           <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-accent btn-lg">Browse Products</a>
@@ -92,7 +86,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   <?php endif; ?>
 </section>
 
-<!-- Slim stats strip — sits below the ad display, doesn't compete with the banner image -->
+<!-- STATS STRIP -->
 <section class="stats-strip">
   <div class="container">
     <div class="stats-strip-grid">
@@ -106,22 +100,19 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 <?php if (count($heroBanners) > 1): ?>
 <script>
 (function(){
-  const SLIDE_DURATION = 6000; // ms — also drives the progress bar fill speed
-
-  const slideEls   = document.querySelectorAll('#hero-carousel .ad-slide');
-  const prevBtn     = document.getElementById('hero-prev');
-  const nextBtn     = document.getElementById('hero-next');
-  const currentNumEl = document.getElementById('ad-progress-current');
-  const fillEl      = document.getElementById('ad-progress-fill');
-  let current = 0;
-  let timer = null;
+  const SLIDE_DURATION = 6000;
+  const slideEls = document.querySelectorAll('#hero-carousel .ad-slide');
+  const prevBtn  = document.getElementById('hero-prev');
+  const nextBtn  = document.getElementById('hero-next');
+  const numEl    = document.getElementById('ad-progress-current');
+  const fillEl   = document.getElementById('ad-progress-fill');
+  let current = 0, timer = null;
 
   function render(i){
     current = i;
-    slideEls.forEach((el,idx)=>el.classList.toggle('active', idx===i));
-    if (currentNumEl) currentNumEl.textContent = String(i+1).padStart(2,'0');
+    slideEls.forEach((el,idx) => el.classList.toggle('active', idx===i));
+    if (numEl) numEl.textContent = String(i+1).padStart(2,'0');
     if (fillEl) {
-      // Restart the fill animation cleanly by forcing a reflow
       fillEl.style.transition = 'none';
       fillEl.style.width = '0%';
       void fillEl.offsetWidth;
@@ -129,23 +120,17 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       fillEl.style.width = '100%';
     }
   }
-
   function next(){ render((current+1) % slideEls.length); }
   function prev(){ render((current-1+slideEls.length) % slideEls.length); }
+  function startAutoplay(){ clearInterval(timer); timer = setInterval(next, SLIDE_DURATION); }
 
-  function startAutoplay(){
-    clearInterval(timer);
-    timer = setInterval(next, SLIDE_DURATION);
-  }
-
-  if (prevBtn) prevBtn.addEventListener('click', ()=>{ prev(); startAutoplay(); });
-  if (nextBtn) nextBtn.addEventListener('click', ()=>{ next(); startAutoplay(); });
+  if (prevBtn) prevBtn.addEventListener('click', () => { prev(); startAutoplay(); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { next(); startAutoplay(); });
 
   const heroEl = document.getElementById('hero-carousel');
-  heroEl.addEventListener('mouseenter', ()=>{ clearInterval(timer); if(fillEl) fillEl.style.animationPlayState='paused'; });
+  heroEl.addEventListener('mouseenter', () => clearInterval(timer));
   heroEl.addEventListener('mouseleave', startAutoplay);
 
-  // Swipe support on touch devices
   let startX = 0;
   heroEl.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
   heroEl.addEventListener('touchend', e => {
@@ -153,8 +138,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
     if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); startAutoplay(); }
   }, {passive:true});
 
-  render(0);
-  startAutoplay();
+  render(0); startAutoplay();
 })();
 </script>
 <?php endif; ?>
@@ -184,20 +168,17 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
         $catGradients = [
           0 => ['#8B241D','#C0392B'],
         ];
+        $catBgPatterns=[
+          '📦'=>'cubic','📜'=>'waves','🗂️'=>'dots','🎁'=>'grid',
+          '🧵'=>'lines','🎀'=>'cross','🧴'=>'rings','🖌️'=>'brush',
+        ];
         foreach($categories as $idx=>$cat):
-          $icon = $catIcons[$cat['name']] ?? ($cat['icon'] ?: '📦');
+          $icon=$catIcons[$cat['name']] ?? '📦';
           $g = $catGradients[$idx % count($catGradients)];
-          $catImgs = array_values(array_filter(explode(',', $cat['images'] ?? '')));
-          $catPhoto = $catImgs[0] ?? null;
         ?>
-        <a href="<?= BASE_URL ?>/public/products.php?category=<?= $cat['id'] ?>" class="cat-card <?= $catPhoto ? 'cat-card-photo' : '' ?>" style="--gc1:<?= $g[0] ?>;--gc2:<?= $g[1] ?>">
-          <?php if ($catPhoto): ?>
-            <img src="<?= sH(UPLOAD_URL.$catPhoto) ?>" alt="<?= sH($cat['name']) ?>" class="cat-card-img" loading="lazy">
-            <div class="cat-card-fade"></div>
-          <?php else: ?>
-            <div class="cat-card-bg"></div>
-            <div class="cat-card-shine"></div>
-          <?php endif; ?>
+        <a href="<?= BASE_URL ?>/public/products.php?category=<?= $cat['id'] ?>" class="cat-card" style="--gc1:<?= $g[0] ?>;--gc2:<?= $g[1] ?>">
+          <div class="cat-card-bg"></div>
+          <div class="cat-card-shine"></div>
           <div class="cat-card-content">
             <div class="cat-card-icon-wrap">
               <span class="cat-card-icon"><?= $icon ?></span>
@@ -297,19 +278,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 .cat-carousel-wrapper {
   overflow: hidden;
   border-radius: var(--r-lg);
-  position: relative;
-}
-.cat-carousel-wrapper::after {
-  /* Soft fade at the right edge hints there's more to scroll — a subtle
-     premium touch, desktop only (tablet/mobile use native scroll where
-     the peek effect already does this job). */
-  content: '';
-  position: absolute;
-  top: 0; right: 0; bottom: 12px;
-  width: 64px;
-  background: linear-gradient(90deg, transparent, var(--n50) 85%);
-  pointer-events: none;
-  z-index: 2;
 }
 .cat-carousel-track {
   display: flex;
@@ -330,7 +298,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 .cat-card {
   flex-shrink: 0;
   width: 230px;
-  min-height: 230px;
   border-radius: 20px;
   padding: 26px 20px 22px;
   text-decoration: none;
@@ -346,22 +313,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 .cat-card:hover {
   transform: translateY(-6px) scale(1.02);
   box-shadow: 0 16px 40px rgba(0,0,0,.2), 0 4px 12px rgba(0,0,0,.1);
-}
-/* Photo-mode cards — a real category image fills the card, with a
-   bottom-up gradient fade so the name/count text stays legible on any
-   photo, without darkening the image as much as a flat overlay would. */
-.cat-card-photo { background: var(--n900); }
-.cat-card-img {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover; object-position: center;
-  transition: transform .4s cubic-bezier(.4,0,.2,1);
-}
-.cat-card-photo:hover .cat-card-img { transform: scale(1.08); }
-.cat-card-fade {
-  position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(20,8,6,.05) 0%, rgba(20,8,6,.35) 55%, rgba(20,8,6,.85) 100%);
-  pointer-events: none;
 }
 .cat-card-bg {
   position: absolute; inset: 0;
@@ -459,54 +410,16 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   background: var(--brand);
 }
 
-/* ── Tablet (1025px and below, down to 769px): smaller cards, native
-   scroll-snap carousel, arrow buttons hidden in favor of swipe/scroll ── */
-@media(max-width:1024px){
-  .cat-carousel-section { padding: 48px 0 40px; }
-  .cat-card { width: 200px; min-height: 210px; padding: 24px 18px 20px; }
-  .cat-carousel-nav-btns { display: none; }
-  .cat-carousel-dots { display: none; } /* native scrollbar/snap replaces page dots */
-  .cat-carousel-wrapper::after { display: none; }
-  .cat-carousel-wrapper {
-    overflow-x: auto;
-    overflow-y: hidden;
-    border-radius: 0;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .cat-carousel-wrapper::-webkit-scrollbar { display: none; }
-  .cat-carousel-track {
-    transition: none;
-    scroll-snap-type: x mandatory;
-    /* Negative-margin + padding "peek" trick: the first/last card sit
-       flush with the container edge while still allowing a sliver of
-       the next card to peek in, signalling there's more to scroll. */
-    padding: 8px 24px 16px;
-    margin: 0 -24px;
-  }
-  .cat-card { scroll-snap-align: start; }
-}
-
-/* ── Mobile (768px and below): tighter cards, same scroll-snap system ── */
 @media(max-width:768px){
-  .cat-carousel-section { padding: 40px 0 32px; }
-  .cat-carousel-header { margin-bottom: 24px; }
+  .cat-card { width: 168px; padding: 22px 16px 18px; }
   .cat-carousel-title { font-size: 1.5rem; }
-  .cat-carousel-sub { font-size: 13px; }
-  .cat-card { width: 172px; min-height: 196px; padding: 20px 16px 16px; border-radius: 16px; }
-  .cat-card-icon-wrap { width: 46px; height: 46px; border-radius: 13px; margin-bottom: 14px; }
-  .cat-card-icon { font-size: 23px; }
-  .cat-card-name { font-size: 13.5px; }
-  .cat-card-industry { font-size: 10.5px; }
-  .cat-card-count { padding: 6px 10px; margin-bottom: 10px; }
-  .cat-card-count-num { font-size: 17px; }
-  .cat-card-count-lbl { font-size: 10px; }
-  .cat-card-arrow { width: 24px; height: 24px; }
-  .cat-carousel-track { padding: 6px 16px 14px; margin: 0 -16px; }
-}
-
-@media(max-width:480px){
-  .cat-card { width: 158px; min-height: 184px; }
+  .cat-carousel-nav-btns { display: none; }
+  .cat-carousel-wrapper { overflow-x: auto; border-radius: 0; }
+  .cat-carousel-track { transition: none; padding: 8px 0 16px; }
+  .compare-group{
+    display:grid;
+    grid-template-columns: 1fr !important;
+  }
 }
 </style>
 
@@ -516,32 +429,18 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   const prevBtn = document.getElementById('cat-prev');
   const nextBtn = document.getElementById('cat-next');
   const dotsEl  = document.getElementById('cat-dots');
-  const wrapper = track ? track.parentElement : null;
 
-  if(!track || !prevBtn || !nextBtn || !wrapper) return;
+  if(!track || !prevBtn || !nextBtn) return;
 
-  const cards = track.querySelectorAll('.cat-card');
-  const gap   = 18;
+  const cards     = track.querySelectorAll('.cat-card');
+  const gap       = 18;
+  let cardW       = 230 + gap;
+  const visible   = () => Math.max(1, Math.floor(track.parentElement.offsetWidth / cardW));
+  const maxIndex  = () => Math.max(0, cards.length - visible());
+  let current     = 0;
 
-  // Below this width the carousel switches to native horizontal scroll
-  // with scroll-snap (see CSS) — buttery-smooth touch scrolling, no JS
-  // fighting the browser for control. Above it, JS drives a transform-
-  // based "paged" carousel with arrow buttons + dots.
-  const MOBILE_BREAKPOINT = 768;
-  const isDesktopMode = () => window.innerWidth > MOBILE_BREAKPOINT;
-
-  let current = 0;
-
-  function cardWidth(){
-    // Read the actual rendered width of the first card rather than a
-    // hardcoded number, so this stays correct at every screen size.
-    const first = cards[0];
-    return first ? first.getBoundingClientRect().width + gap : 248;
-  }
-  function visible(){ return Math.max(1, Math.floor(wrapper.offsetWidth / cardWidth())); }
-  function maxIndex(){ return Math.max(0, cards.length - visible()); }
-
-  function buildDots(){
+  // Build dots
+  function buildDots() {
     dotsEl.innerHTML = '';
     const pages = maxIndex() + 1;
     for(let i = 0; i < pages; i++){
@@ -552,46 +451,35 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       dotsEl.appendChild(d);
     }
   }
+
   function updateDots(){
     dotsEl.querySelectorAll('.cat-dot').forEach((d,i) => d.classList.toggle('active', i === current));
   }
 
   function goTo(idx){
-    if (!isDesktopMode()) return; // native scroll handles mobile/tablet
     current = Math.max(0, Math.min(idx, maxIndex()));
-    track.style.transform = 'translateX(-' + (current * cardWidth()) + 'px)';
+    track.style.transform = 'translateX(-' + (current * cardW) + 'px)';
     prevBtn.disabled = current === 0;
     nextBtn.disabled = current >= maxIndex();
     updateDots();
   }
 
-  function enterDesktopMode(){
-    track.style.transform = 'translateX(0px)';
-    buildDots();
-    goTo(0);
-  }
-  function enterMobileMode(){
-    // Hand control fully back to native scrolling — clear any leftover
-    // JS transform so it can't conflict with touch/scroll position.
-    track.style.transform = 'none';
-    dotsEl.innerHTML = '';
-  }
-
   prevBtn.addEventListener('click', () => goTo(current - 1));
   nextBtn.addEventListener('click', () => goTo(current + 1));
 
-  let wasDesktop = isDesktopMode();
-  if (wasDesktop) enterDesktopMode(); else enterMobileMode();
+  // Recalculate on resize
+  window.addEventListener('resize', () => { cardW = 200 + gap; buildDots(); goTo(Math.min(current, maxIndex())); });
 
-  window.addEventListener('resize', () => {
-    const nowDesktop = isDesktopMode();
-    if (nowDesktop !== wasDesktop) {
-      wasDesktop = nowDesktop;
-      nowDesktop ? enterDesktopMode() : enterMobileMode();
-    } else if (nowDesktop) {
-      goTo(Math.min(current, maxIndex()));
-    }
-  });
+  // Touch / swipe on mobile
+  let startX = 0;
+  track.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
+  track.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    if(Math.abs(dx) > 40) dx < 0 ? goTo(current+1) : goTo(current-1);
+  }, {passive:true});
+
+  buildDots();
+  goTo(0);
 })();
 </script>
 
@@ -652,7 +540,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       <h2>How PaperMart Works</h2>
       <p>Connect with verified manufacturers in 3 easy steps — completely free for buyers.</p>
     </div>
-    <div class="hiw-grid">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:36px" class="compare-group">
       <?php
       $steps=[
         ['🔍','Search & Discover','Browse thousands of paper products from verified manufacturers. Filter by GSM, grade, and specifications.'],
@@ -661,56 +549,16 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       ];
       foreach ($steps as $i=>[$icon,$title,$desc]):
       ?>
-      <div class="hiw-step">
-        <div class="hiw-step-num"><?= $i+1 ?></div>
-        <div class="hiw-step-icon"><?= $icon ?></div>
-        <h3><?= $title ?></h3>
-        <p><?= $desc ?></p>
+      <div style="text-align:center;padding:32px 24px;border:1px solid var(--n200);border-radius:var(--r-lg);position:relative;transition:var(--t)" onmouseover="this.style.borderColor='var(--brand-2)';this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow)'" onmouseout="this.style.borderColor='var(--n200)';this.style.transform='none';this.style.boxShadow='none'">
+        <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;font-family:'Poppins',sans-serif;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center"><?= $i+1 ?></div>
+        <div style="font-size:44px;margin-bottom:16px"><?= $icon ?></div>
+        <h3 style="font-size:17px;margin-bottom:10px"><?= $title ?></h3>
+        <p style="font-size:13.5px;color:var(--n500);line-height:1.7"><?= $desc ?></p>
       </div>
       <?php endforeach; ?>
     </div>
   </div>
 </section>
-
-<style>
-.hiw-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:36px;position:relative}
-.hiw-grid::before{
-  /* Connecting line between steps — desktop only, sits behind the icons */
-  content:'';position:absolute;top:68px;left:16.5%;right:16.5%;height:2px;
-  background:repeating-linear-gradient(90deg, var(--n200) 0 8px, transparent 8px 16px);
-  z-index:0;
-}
-.hiw-step{
-  text-align:center;padding:36px 26px 30px;
-  border:1px solid var(--n200);border-radius:var(--r-lg);
-  position:relative;background:#fff;z-index:1;
-  transition:border-color .25s ease,transform .25s ease,box-shadow .25s ease;
-}
-.hiw-step:hover{border-color:var(--brand-2);transform:translateY(-6px);box-shadow:var(--shadow)}
-.hiw-step-num{
-  position:absolute;top:-16px;left:50%;transform:translateX(-50%);
-  width:32px;height:32px;border-radius:50%;
-  background:var(--brand);color:#fff;
-  font-family:'Poppins',sans-serif;font-weight:800;font-size:14px;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 12px rgba(139,36,29,.3);
-}
-.hiw-step-icon{
-  width:76px;height:76px;border-radius:50%;
-  background:linear-gradient(145deg,var(--brand-3),#fff5e6);
-  border:1.5px solid #f5deab;
-  display:flex;align-items:center;justify-content:center;
-  font-size:34px;margin:0 auto 20px;
-  transition:transform .3s ease;
-}
-.hiw-step:hover .hiw-step-icon{transform:scale(1.08) rotate(-4deg)}
-.hiw-step h3{font-size:17px;margin-bottom:10px;font-weight:700}
-.hiw-step p{font-size:13.5px;color:var(--n500);line-height:1.7;margin:0}
-@media(max-width:768px){
-  .hiw-grid{grid-template-columns:1fr;gap:24px}
-  .hiw-grid::before{display:none}
-}
-</style>
 
 <!-- LATEST PRODUCTS -->
 <?php if ($latest): ?>
@@ -758,10 +606,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 
 <!-- CTA BANNER -->
 <section class="cta-banner">
-  <!-- Background photo goes here — drop a warehouse/factory image at
-       this path and it'll show through the gradient overlay below.
-       Until then, the gradient alone renders cleanly on its own. -->
-  <div class="cta-banner-bg" style="background-image:url('<?= BASE_URL ?>/public/assets/img/cta-warehouse.jpg')"></div>
   <div class="cta-banner-overlay"></div>
   <div class="container cta-banner-content">
     <h2>Are You a Paper Manufacturer?</h2>
@@ -772,17 +616,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
     </div>
   </div>
 </section>
-
-<style>
-.cta-banner{position:relative;overflow:hidden;padding:64px 0;background:linear-gradient(135deg,var(--brand),#62130a)}
-.cta-banner-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.35}
-.cta-banner-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(98,19,10,.92),rgba(139,36,29,.88))}
-.cta-banner-content{position:relative;z-index:1;text-align:center}
-.cta-banner-content h2{color:#fff;font-size:clamp(1.6rem,3.5vw,2.1rem);margin-bottom:12px;font-weight:800}
-.cta-banner-content p{color:rgba(255,255,255,.78);font-size:1.05rem;margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6}
-.cta-banner-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-@media(max-width:480px){.cta-banner{padding:44px 0}}
-</style>
 
 <!-- ENQUIRY MODAL -->
 <div class="modal-backdrop" id="enquiry-modal">
