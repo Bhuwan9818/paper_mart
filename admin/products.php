@@ -33,7 +33,7 @@ if (isset($_GET['action'], $_GET['id'])) {
             flash('success','Product permanently deleted.');
             break;
     }
-    header('Location: '.BASE_URL.'/admin/products.php?'.http_build_query(array_filter(['search'=>$_GET['search']??'','status'=>$_GET['status']??'','featured'=>$_GET['featured']??'']))); exit;
+    header('Location: '.BASE_URL.'/admin/products.php?'.http_build_query(array_filter(['search'=>$_GET['search']??'','status'=>$_GET['status']??'','featured'=>$_GET['featured']??'','vendor_id'=>$_GET['vendor_id']??'','page'=>$_GET['page']??'']))); exit;
 }
 
 /* ── Bulk actions ───────────────────────────────────────── */
@@ -125,12 +125,17 @@ include __DIR__ . '/../includes/head.php';
   <?= showFlash() ?>
 
   <!-- Status pills -->
+  <?php
+  // Build a base query string preserving search + vendor filters but
+  // always resetting to page 1 when switching status/featured tabs.
+  $pillBase = array_filter(['search'=>$search,'vendor_id'=>$vendor?$vendor:'']);
+  ?>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-    <a href="?" class="stat-pill all <?= (!$status&&!$featured)?'sel':'' ?>">📦 All <strong><?= $counts['total'] ?></strong></a>
-    <a href="?status=pending"  class="stat-pill pend  <?= $status==='pending' ?'sel':'' ?>">⏳ Pending <strong><?= $counts['pending'] ?></strong></a>
-    <a href="?status=active"   class="stat-pill active <?= $status==='active'  ?'sel':'' ?>">✅ Active <strong><?= $counts['active'] ?></strong></a>
-    <a href="?status=inactive" class="stat-pill inact  <?= $status==='inactive'?'sel':'' ?>">⛔ Inactive <strong><?= $counts['inactive'] ?></strong></a>
-    <a href="?featured=1"      class="stat-pill feat   <?= $featured?'sel':'' ?>">⭐ Featured <strong><?= $counts['featured'] ?></strong></a>
+    <a href="?<?= http_build_query($pillBase) ?>" class="stat-pill all <?= (!$status&&!$featured)?'sel':'' ?>">📦 All <strong><?= $counts['total'] ?></strong></a>
+    <a href="?<?= http_build_query($pillBase+['status'=>'pending']) ?>"  class="stat-pill pend  <?= $status==='pending' ?'sel':'' ?>">⏳ Pending <strong><?= $counts['pending'] ?></strong></a>
+    <a href="?<?= http_build_query($pillBase+['status'=>'active']) ?>"   class="stat-pill active <?= $status==='active'  ?'sel':'' ?>">✅ Active <strong><?= $counts['active'] ?></strong></a>
+    <a href="?<?= http_build_query($pillBase+['status'=>'inactive']) ?>" class="stat-pill inact  <?= $status==='inactive'?'sel':'' ?>">⛔ Inactive <strong><?= $counts['inactive'] ?></strong></a>
+    <a href="?<?= http_build_query($pillBase+['featured'=>'1']) ?>"      class="stat-pill feat   <?= $featured?'sel':'' ?>">⭐ Featured <strong><?= $counts['featured'] ?></strong></a>
   </div>
 
   <div class="card">
@@ -226,25 +231,28 @@ include __DIR__ . '/../includes/head.php';
             <td style="font-size:13px;font-weight:600;white-space:nowrap"><?= sanitize($p['price_range']?:'—') ?></td>
             <td style="font-size:13px;color:var(--text-muted)"><?= number_format((int)$p['views']) ?></td>
             <td style="text-align:center">
-              <a href="?action=feature&id=<?= $p['id'] ?>&<?= http_build_query(['search'=>$search,'status'=>$status,'featured'=>$featured]) ?>"
+              <a href="?action=feature&id=<?= $p['id'] ?>&<?= http_build_query(array_filter(['search'=>$search,'status'=>$status,'featured'=>$featured,'vendor_id'=>$vendor?$vendor:'','page'=>$page>1?$page:''])) ?>"
                  class="feat-star <?= $p['is_featured']?'on':'' ?>"
                  title="<?= $p['is_featured']?'Remove from featured':'Feature this product' ?>">⭐</a>
             </td>
             <td><?= statusBadge($p['status']) ?></td>
             <td style="font-size:12px;color:var(--text-muted);white-space:nowrap"><?= date('d M Y',strtotime($p['created_at'])) ?></td>
             <td>
+              <?php
+              $rowCtx = http_build_query(array_filter(['search'=>$search,'status'=>$status,'featured'=>$featured,'vendor_id'=>$vendor?$vendor:'','page'=>$page>1?$page:'']));
+              ?>
               <div class="td-actions">
                 <a href="edit-product.php?id=<?= $p['id'] ?>" class="btn btn-outline btn-xs" title="Edit">✏️ Edit</a>
                 <a href="view-product.php?id=<?= $p['id'] ?>" class="btn btn-outline btn-xs" title="View">👁</a>
                 <?php if ($p['status']==='pending'): ?>
-                  <a href="?action=approve&id=<?= $p['id'] ?>" class="btn btn-success btn-xs" title='Approve'  onclick="return confirm('Approve?')">✅</a>
-                  <a href="?action=reject&id=<?= $p['id'] ?>"  class="btn btn-danger  btn-xs" title='Reject'  onclick="return confirm('Reject?')">❌</a>
+                  <a href="?action=approve&id=<?= $p['id'] ?>&<?= $rowCtx ?>" class="btn btn-success btn-xs" title='Approve'    onclick="return confirm('Approve?')">✅</a>
+                  <a href="?action=reject&id=<?= $p['id'] ?>&<?= $rowCtx ?>"  class="btn btn-danger  btn-xs" title='Reject'     onclick="return confirm('Reject?')">❌</a>
                 <?php elseif ($p['status']==='active'): ?>
-                  <a href="?action=reject&id=<?= $p['id'] ?>" class="btn btn-warning btn-xs" title='Deactivate' onclick="return confirm('Deactivate?')">⏸</a>
+                  <a href="?action=reject&id=<?= $p['id'] ?>&<?= $rowCtx ?>"  class="btn btn-warning btn-xs" title='Deactivate' onclick="return confirm('Deactivate?')">⏸</a>
                 <?php else: ?>
-                  <a href="?action=approve&id=<?= $p['id'] ?>" class="btn btn-success btn-xs" title='Activate' onclick="return confirm('Activate?')">▶</a>
+                  <a href="?action=approve&id=<?= $p['id'] ?>&<?= $rowCtx ?>" class="btn btn-success btn-xs" title='Activate'   onclick="return confirm('Activate?')">▶</a>
                 <?php endif; ?>
-                <a href="?action=delete&id=<?= $p['id'] ?>" class="btn btn-danger btn-xs" title='Permanently Delete' onclick="return confirm('Permanently delete?')">🗑</a>
+                <a href="?action=delete&id=<?= $p['id'] ?>&<?= $rowCtx ?>"    class="btn btn-danger  btn-xs" title='Permanently Delete' onclick="return confirm('Permanently delete?')">🗑</a>
               </div>
             </td>
           </tr>

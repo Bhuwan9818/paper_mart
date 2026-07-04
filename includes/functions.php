@@ -107,7 +107,9 @@ function sanitize($str) {
 function paginate($total, $perPage, $current, $url) {
     $pages = ceil($total / $perPage);
     if ($pages <= 1) return '';
-    $sep = strpos($url, '?') ? '&' : '?';
+    // strpos returns 0 (falsy) when '?' is the first character — use
+    // !== false so a URL like '?search=foo' correctly gets '&' separator.
+    $sep = (strpos($url, '?') !== false) ? '&' : '?';
     $html = '<div class="pagination">';
     if ($current > 1)
         $html .= "<a href='{$url}{$sep}page=" . ($current-1) . "'>&#8249;</a>";
