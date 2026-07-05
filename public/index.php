@@ -34,7 +34,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
              loading="<?= $i===0?'eager':'lazy' ?>" decoding="async">
       <?php endforeach; ?>
     </div>
-    <div class="container ad-stage-inner">
+    <div class="container ad-stage-inner" style="height:100%;padding-top:0;padding-bottom:0;">
       <div class="ad-search-card">
         <h3>Find Your Products</h3>
         <form action="<?= BASE_URL ?>/public/products.php" method="GET">
@@ -278,6 +278,9 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 .cat-carousel-wrapper {
   overflow: hidden;
   border-radius: var(--r-lg);
+  /* Subtle right fade hints there are more cards to scroll on desktop */
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 85%, transparent 100%);
 }
 .cat-carousel-track {
   display: flex;
@@ -298,6 +301,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 .cat-card {
   flex-shrink: 0;
   width: 230px;
+  min-height: 224px;
   border-radius: 20px;
   padding: 26px 20px 22px;
   text-decoration: none;
@@ -410,16 +414,67 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   background: var(--brand);
 }
 
-@media(max-width:768px){
-  .cat-card { width: 168px; padding: 22px 16px 18px; }
-  .cat-carousel-title { font-size: 1.5rem; }
+/* Tablet (≤1024px): native scroll-snap, no JS transform, arrow buttons hidden */
+@media(max-width:1024px){
   .cat-carousel-nav-btns { display: none; }
-  .cat-carousel-wrapper { overflow-x: auto; border-radius: 0; }
-  .cat-carousel-track { transition: none; padding: 8px 0 16px; }
-  .compare-group{
-    display:grid;
-    grid-template-columns: 1fr !important;
+  .cat-carousel-dots { display: none; }
+  .cat-carousel-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-radius: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* Remove the desktop right-fade mask on mobile */
+    -webkit-mask-image: none;
+    mask-image: none;
   }
+  .cat-carousel-wrapper::-webkit-scrollbar { display: none; }
+  .cat-carousel-track {
+    /* Disable JS-driven transform, CSS scroll-snap takes over */
+    transition: none;
+    /* scroll-snap: each card snaps cleanly to the left edge */
+    scroll-snap-type: x mandatory;
+    /* Padding creates the "peek" effect — next card is just visible */
+    padding: 8px 20px 16px;
+    margin: 0 -20px;
+  }
+  .cat-card {
+    scroll-snap-align: start;
+    width: 200px;
+  }
+}
+
+/* Mobile (≤768px): smaller cards, same scroll-snap mechanism */
+@media(max-width:768px){
+  .cat-carousel-section { padding: 40px 0 32px; }
+  .cat-carousel-header { margin-bottom: 22px; }
+  .cat-carousel-title { font-size: 1.4rem; }
+  .cat-carousel-sub { font-size: 13px; }
+  .cat-card {
+    width: 172px;
+    min-height: 192px;
+    padding: 20px 16px 16px;
+    border-radius: 16px;
+  }
+  .cat-card-icon-wrap { width: 46px; height: 46px; border-radius: 13px; margin-bottom: 14px; }
+  .cat-card-icon { font-size: 24px; }
+  .cat-card-name { font-size: 13px; }
+  .cat-card-industry { font-size: 10.5px; }
+  .cat-card-count { padding: 6px 10px; margin-bottom: 10px; }
+  .cat-card-count-num { font-size: 18px; }
+  .cat-card-count-lbl { font-size: 10.5px; }
+  .cat-card-arrow { width: 24px; height: 24px; }
+  .cat-carousel-track { padding: 6px 16px 14px; margin: 0 -16px; }
+}
+
+/* Small phone (≤480px): narrowest cards so 2+ are always visible */
+@media(max-width:480px){
+  .cat-card { width: 155px; min-height: 182px; }
+}
+
+.compare-group{
+  display:grid;
+  grid-template-columns: 1fr !important;
 }
 </style>
 
@@ -429,57 +484,83 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   const prevBtn = document.getElementById('cat-prev');
   const nextBtn = document.getElementById('cat-next');
   const dotsEl  = document.getElementById('cat-dots');
+  const wrapper = track ? track.parentElement : null;
 
-  if(!track || !prevBtn || !nextBtn) return;
+  if(!track || !prevBtn || !nextBtn || !wrapper) return;
 
-  const cards     = track.querySelectorAll('.cat-card');
-  const gap       = 18;
-  let cardW       = 230 + gap;
-  const visible   = () => Math.max(1, Math.floor(track.parentElement.offsetWidth / cardW));
-  const maxIndex  = () => Math.max(0, cards.length - visible());
-  let current     = 0;
+  const cards = track.querySelectorAll('.cat-card');
+  const gap   = 18;
 
-  // Build dots
-  function buildDots() {
+  // Below this width switch to native scroll-snap (CSS-only, no JS)
+  const MOBILE_BP = 1024;
+  const isDesktop = () => window.innerWidth > MOBILE_BP;
+
+  let current = 0;
+
+  // Read the ACTUAL rendered card width rather than a hardcoded number.
+  // This is crucial — if CSS changes card width at any breakpoint, the
+  // JS automatically picks up the real value with no manual update.
+  function cardWidth(){
+    const first = cards[0];
+    return first ? first.getBoundingClientRect().width + gap : 230 + gap;
+  }
+  function visible(){ return Math.max(1, Math.floor(wrapper.offsetWidth / cardWidth())); }
+  function maxIndex(){ return Math.max(0, cards.length - visible()); }
+
+  function buildDots(){
     dotsEl.innerHTML = '';
     const pages = maxIndex() + 1;
     for(let i = 0; i < pages; i++){
       const d = document.createElement('button');
       d.className = 'cat-dot' + (i === 0 ? ' active' : '');
-      d.setAttribute('aria-label', 'Go to page ' + (i+1));
+      d.setAttribute('aria-label', 'Page ' + (i+1));
       d.addEventListener('click', () => goTo(i));
       dotsEl.appendChild(d);
     }
   }
-
   function updateDots(){
     dotsEl.querySelectorAll('.cat-dot').forEach((d,i) => d.classList.toggle('active', i === current));
   }
 
   function goTo(idx){
+    if (!isDesktop()) return; // native CSS scroll-snap handles mobile
     current = Math.max(0, Math.min(idx, maxIndex()));
-    track.style.transform = 'translateX(-' + (current * cardW) + 'px)';
+    track.style.transform = 'translateX(-' + (current * cardWidth()) + 'px)';
     prevBtn.disabled = current === 0;
     nextBtn.disabled = current >= maxIndex();
     updateDots();
   }
 
+  function enterDesktopMode(){
+    track.style.transform = 'translateX(0px)';
+    buildDots();
+    goTo(0);
+  }
+  function enterMobileMode(){
+    // Clear any JS-applied transform so native scroll-snap takes over
+    track.style.transform = 'none';
+    dotsEl.innerHTML = '';
+  }
+
   prevBtn.addEventListener('click', () => goTo(current - 1));
   nextBtn.addEventListener('click', () => goTo(current + 1));
 
-  // Recalculate on resize
-  window.addEventListener('resize', () => { cardW = 200 + gap; buildDots(); goTo(Math.min(current, maxIndex())); });
+  let wasDesktop = isDesktop();
+  if (wasDesktop) enterDesktopMode(); else enterMobileMode();
 
-  // Touch / swipe on mobile
-  let startX = 0;
-  track.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
-  track.addEventListener('touchend',   e => {
-    const dx = e.changedTouches[0].clientX - startX;
-    if(Math.abs(dx) > 40) dx < 0 ? goTo(current+1) : goTo(current-1);
-  }, {passive:true});
-
-  buildDots();
-  goTo(0);
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const nowDesktop = isDesktop();
+      if (nowDesktop !== wasDesktop) {
+        wasDesktop = nowDesktop;
+        nowDesktop ? enterDesktopMode() : enterMobileMode();
+      } else if (nowDesktop) {
+        goTo(Math.min(current, maxIndex()));
+      }
+    }, 120); // debounce so resize doesn't thrash
+  });
 })();
 </script>
 
