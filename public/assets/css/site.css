@@ -112,67 +112,24 @@ section.compact{padding:40px 0}
 .hero-tag{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.75);padding:4px 12px;border-radius:100px;font-size:12px;cursor:pointer;transition:var(--t)}
 .hero-tag:hover{background:rgba(255,255,255,.2);color:#fff}
 
-/* ── AD DISPLAY SECTION (hero banner carousel) ─────────────────────────
-   The banner image IS the content — search and caption sit on top as
-   deliberate, solid UI elements. The section uses real <img> tags
-   (not background-image) so the browser composites crossfades on the
-   GPU via opacity only — no repaints, no scale animations.
-   Height is fluid via clamp() so every laptop width renders correctly
-   without fixed-pixel jumps. Below 1024px the search card is hidden
-   entirely — those screens get a pure, full-bleed ad image. ────────── */
-
-/* ─────────────────────────────────────────────────────────────────────
-   AD STAGE — RESPONSIVE ARCHITECTURE
-   ─────────────────────────────────────────────────────────────────────
-   WHAT WAS WRONG:
-   ┌─ .ad-stage had no intrinsic height — it relied entirely on
-   │  .ad-stage-inner (position:relative) pushing it open, while
-   │  .ad-slides (position:absolute) tried to fill it. On mobile,
-   │  this created fragile height chain where any layout shift could
-   │  collapse the section to 0px.
-   ├─ Fixed clamp() heights (380px–580px) ignored image aspect ratio.
-   │  Banner images are 1600×600 (8:3 ratio). Forcing taller heights
-   │  on narrow screens cropped away most of the image content.
-   ├─ object-position:center caused focal content to be cropped
-   │  symmetrically — usually worse than cropping from the bottom.
-   └─ Two different breakpoint systems fought each other.
-
-   HOW THE NEW SYSTEM WORKS:
-   ┌─ .ad-stage uses aspect-ratio:8/3 as the primary sizing mechanism.
-   │  This preserves the natural image proportions at every width:
-   │    → 1920px wide → 720px tall  (big desktop, feels cinematic)
-   │    → 1440px wide → 540px tall  (MacBook, perfect)
-   │    → 1280px wide → 480px tall  (Windows laptop, great)
-   │    →  768px wide → 288px tall  (tablet, natural)
-   │    →  390px wide → 146px tall  (phone, natural but too small)
-   ├─ min-height:200px prevents it collapsing on tiny phones
-   ├─ max-height:620px prevents it being too tall on ultra-wide
-   ├─ On phones (≤480px) we switch from aspect-ratio to a fixed
-   │  min-height:240px so the section has enough visual presence
-   │  even at very narrow widths where the proportional height
-   │  would be under 180px — too short to read any content.
-   ├─ object-position:center 20% keeps upper content visible when
-   │  the browser must crop the image on very tall containers
-   └─ The search card uses clamp() for fluid width, disappears ≤1024px
-   ──────────────────────────────────────────────────────────────────── */
-
-/* Stage — the outer container.
-   aspect-ratio drives height proportionally from width.
-   min/max-height act as safety rails. */
 .ad-stage{
   position:relative;
+  width:100%;
   overflow:hidden;
   background:var(--n900);
-  width:100%;
-  /* 8:3 matches the 1600×600 banner design ratio exactly.
-     Every screen width now gets a proportional height automatically. */
+  /* 8:3 matches the 1600×600 banner image exactly — no crop needed */
   aspect-ratio:8/3;
-  min-height:200px;  /* never collapses to nothing on tiny screens */
-  max-height:620px;  /* never overwhelms ultra-wide monitors */
+  /* Mobile floor: prevents section collapsing to ~140px on phones */
+  min-height:220px;
+  /* Large-screen ceiling: prevents 720px+ height on 1080p monitors */
+  max-height:680px;
+  /* Contain any child that might try to expand beyond this box */
+  contain:layout;
 }
 
-/* Slides layer — fills the entire stage absolutely.
-   No height needed here; .ad-stage's aspect-ratio drives the size. */
+/* SLIDES LAYER: fills the entire stage.
+   Both position:absolute and inset:0 are required — this element must
+   not contribute to document flow so it never fights aspect-ratio. */
 .ad-slides{
   position:absolute;
   inset:0;
@@ -180,242 +137,248 @@ section.compact{padding:40px 0}
   height:100%;
 }
 
-/* Individual slide images.
-   object-fit:cover fills the frame without distortion.
-   object-position:center 20% biases toward the upper portion of the
-   image — most banner designs put the focal content (logo, headline,
-   product shot) in the upper-center area. This avoids cropping the
-   top when the container is proportionally taller than the image. */
+/* INDIVIDUAL SLIDE IMAGE:
+   object-fit:cover fills the frame completely (no empty space).
+   object-position:center 25% anchors to slightly above center —
+   most banner designs place logos/products in the upper-center area,
+   so this minimises visible content loss on the rare cases where
+   max-height kicks in at large screens. */
 .ad-slide{
+  position:absolute;
+  inset:0;
   display:block;
   width:100%;
   height:100%;
   object-fit:cover;
-  object-position:center 20%;
-  position:absolute;
-  inset:0;
+  object-position:center 25%;
   opacity:0;
+  /* GPU-composited crossfade: only opacity animates, no paint/layout */
   transition:opacity 800ms ease-in-out;
   will-change:opacity;
-  /* Promote to GPU layer for smooth composited crossfade */
   backface-visibility:hidden;
   -webkit-backface-visibility:hidden;
 }
 .ad-slide.active{opacity:1}
 
-/* Inner content overlay — contains the search card and progress bar.
-   position:absolute so it never adds any height to .ad-stage itself
-   (the aspect-ratio drives everything). */
+/* CONTENT OVERLAY: search card + progress bar.
+   Must be position:absolute so it overlays the stage without adding
+   any height to it. The previous position:relative version with an
+   explicit height was fighting the aspect-ratio on some screens. */
 .ad-stage-inner{
   position:absolute;
   inset:0;
   z-index:3;
   display:flex;
   align-items:center;
-  /* Padding prevents content from touching edges on any screen size */
-  padding:0;
+  /* No padding here — let the container element handle horizontal padding */
+}
+/* The .container inside .ad-stage-inner must fill the full width of the
+   absolutely-positioned overlay, so search card can align to the left
+   edge correctly at all viewport widths. */
+.ad-stage-inner .container{
+  width:100%;
 }
 
-/* ── Search card — desktop/laptop only, left-anchored ── */
+/* SEARCH CARD: desktop/laptop only, left-anchored.
+   Uses clamp() so it scales smoothly between 1024px and 1920px.
+   Hidden on tablet and mobile via breakpoint below. */
 .ad-search-card{
   position:relative;
   z-index:4;
   background:#fff;
   border-radius:var(--r-lg);
-  box-shadow:0 24px 60px rgba(0,0,0,.35);
-  /* clamp() makes card fluid between 260px (small laptop) and 340px
-     (large desktop) based on viewport width */
-  padding:clamp(18px,2vw,28px) clamp(16px,1.8vw,26px);
-  width:clamp(260px,24vw,340px);
+  box-shadow:0 20px 56px rgba(0,0,0,.32),0 4px 16px rgba(0,0,0,.14);
+  padding:clamp(16px,1.8vw,26px) clamp(14px,1.6vw,24px);
+  width:clamp(256px,22vw,320px);
   flex-shrink:0;
-  /* Margin from left edge — fluid */
-  margin-left:0;
 }
-/* Soft dark radial vignette behind the card only.
-   Keeps white card readable on any background photo without
-   darkening the right-side ad content at all. */
+/* Localised dark vignette behind the card only.
+   Keeps the white card readable on bright photos without dimming
+   the right-side ad content that buyers actually want to see. */
 .ad-search-card::before{
   content:'';
   position:absolute;
   z-index:-1;
-  top:-60px;left:-60px;
-  width:calc(100% + 220px);
-  height:calc(100% + 180px);
-  background:radial-gradient(ellipse at 28% 32%,rgba(10,5,4,.42) 0%,transparent 68%);
+  inset:-60px -60px -60px -60px;
+  background:radial-gradient(ellipse at 28% 35%,rgba(8,4,3,.44) 0%,transparent 65%);
   pointer-events:none;
 }
 .ad-search-card h3{
   font-family:'Poppins',sans-serif;
-  font-size:clamp(15px,1.4vw,19px);
-  font-weight:700;color:var(--n900);
-  margin-bottom:clamp(12px,1.2vw,16px);
+  font-size:clamp(14px,1.3vw,18px);
+  font-weight:700;
+  color:var(--n900);
+  margin-bottom:clamp(10px,1.1vw,14px);
   letter-spacing:-.01em;
 }
 .ad-search-field{
   width:100%;
-  padding:clamp(9px,0.9vw,11px) 14px;
+  padding:clamp(8px,0.8vw,11px) 13px;
   border:1.5px solid var(--n200);
   border-radius:var(--r-sm);
-  background:var(--n50);color:var(--n900);
-  font-size:clamp(12.5px,1.1vw,13.5px);
+  background:var(--n50);
+  color:var(--n900);
+  font-size:clamp(12px,1vw,13.5px);
   font-family:'DM Sans',sans-serif;
-  margin-bottom:clamp(7px,0.7vw,9px);
+  margin-bottom:clamp(6px,0.7vw,9px);
 }
 .ad-search-field:focus{outline:none;border-color:var(--brand-2)}
 .ad-search-submit{
   width:100%;
-  padding:clamp(10px,1vw,12px);
-  background:var(--brand);color:#fff;border:none;
+  padding:clamp(9px,0.9vw,12px);
+  background:var(--brand);
+  color:#fff;border:none;
   border-radius:var(--r-sm);
-  font-size:clamp(13px,1.1vw,14px);
+  font-size:clamp(12.5px,1vw,14px);
   font-weight:700;cursor:pointer;
-  font-family:'DM Sans',sans-serif;margin-top:2px;
+  font-family:'DM Sans',sans-serif;
+  margin-top:2px;
   transition:background .2s ease,transform .15s ease;
 }
 .ad-search-submit:hover{background:var(--brand-2);transform:translateY(-1px)}
 .ad-search-advanced{
   display:block;text-align:center;
-  margin-top:clamp(10px,1vw,13px);
-  font-size:12px;color:var(--n500);
+  margin-top:clamp(8px,0.9vw,12px);
+  font-size:11.5px;color:var(--n500);
   text-decoration:none;font-weight:600;
 }
 .ad-search-advanced:hover{color:var(--brand-2)}
 
-/* ── Numbered progress bar — absolute bottom edge ── */
+/* PROGRESS BAR: absolute bottom edge.
+   Gradient fades from transparent to dark at the very bottom — gives
+   just enough contrast for white numbers and the gold fill line to be
+   readable on any photo without visually dimming the whole banner. */
 .ad-progress{
-  position:absolute;left:0;right:0;bottom:0;z-index:4;
-  /* Gradient fade ensures progress bar is readable on any image */
-  background:linear-gradient(0deg,rgba(10,5,4,.6) 0%,rgba(10,5,4,0) 100%);
-  padding-top:28px;
+  position:absolute;
+  inset:auto 0 0 0;   /* left:0, right:0, bottom:0 — only 3 edges */
+  z-index:4;
+  background:linear-gradient(0deg,rgba(8,4,3,.58) 0%,rgba(8,4,3,0) 100%);
+  padding-top:32px;
 }
 .ad-progress-inner{
-  display:flex;align-items:center;
-  gap:12px;padding:0 0 16px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:0 0 clamp(12px,1.2vw,18px);
 }
 .ad-progress-num{
   font-family:'Poppins',sans-serif;
-  font-size:clamp(11px,1vw,13px);
+  font-size:clamp(10px,0.9vw,13px);
   font-weight:700;
-  color:rgba(255,255,255,.5);
-  letter-spacing:.04em;flex-shrink:0;
+  color:rgba(255,255,255,.48);
+  letter-spacing:.05em;
+  flex-shrink:0;
+  min-width:20px;
 }
 .ad-progress-num:first-child{color:#fff}
 .ad-progress-track{
-  flex:1;height:2px;
-  max-width:200px;
-  background:rgba(255,255,255,.22);
-  border-radius:2px;overflow:hidden;
+  flex:1;
+  height:2px;
+  max-width:180px;
+  background:rgba(255,255,255,.2);
+  border-radius:2px;
+  overflow:hidden;
 }
 .ad-progress-fill{
-  height:100%;width:0;
+  height:100%;
+  width:0;
   background:var(--accent);
   border-radius:2px;
 }
 .ad-progress-btn{
-  width:clamp(28px,2.4vw,34px);
-  height:clamp(28px,2.4vw,34px);
+  width:clamp(26px,2.2vw,32px);
+  height:clamp(26px,2.2vw,32px);
   border-radius:50%;
-  border:1px solid rgba(255,255,255,.28);
-  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.25);
+  background:rgba(255,255,255,.06);
   color:#fff;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:background .2s ease,border-color .2s ease;
   flex-shrink:0;
 }
-.ad-progress-btn:hover{
-  background:rgba(255,255,255,.18);
-  border-color:rgba(255,255,255,.5);
-}
+.ad-progress-btn:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.45)}
 
-/* ── Fallback hero (zero banners uploaded yet) ── */
+/* FALLBACK HERO: shown when no banners are uploaded yet.
+   Fills the same .ad-stage box (position:absolute, inset:0) so the
+   aspect-ratio sizing still drives section height correctly. */
 .ad-stage-empty{
+  position:absolute;
+  inset:0;
   background:linear-gradient(330deg,#62130a 0%,var(--brand) 55%,#A8302A 100%);
-  /* aspect-ratio on .ad-stage already sets height; this just fills it */
-  width:100%;height:100%;
   display:flex;align-items:center;
   color:#fff;text-align:center;
+  width:100%;height:100%;
 }
 .ad-stage-empty .container{width:100%}
 .ad-stage-empty .hero-label{justify-content:center;margin-inline:auto}
 .ad-stage-empty .hero-ctas{justify-content:center}
 
-/* ── Stats strip below the ad section ── */
+/* STATS STRIP */
 .stats-strip{
   background:var(--brand-3);
   border-bottom:1px solid var(--n200);
-  padding:18px 0;
+  padding:clamp(14px,1.5vw,20px) 0;
 }
 .stats-strip-grid{
-  display:grid;grid-template-columns:repeat(3,1fr);
-  gap:12px;max-width:680px;margin-inline:auto;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+  max-width:680px;
+  margin-inline:auto;
 }
 .stats-strip-item{text-align:center}
 .stats-strip-n{
   font-family:'Poppins',sans-serif;
-  font-size:clamp(18px,2.2vw,24px);
+  font-size:clamp(17px,2vw,24px);
   font-weight:800;color:var(--brand-2);
+  line-height:1;
 }
-.stats-strip-l{font-size:12px;color:var(--n500);margin-top:2px}
+.stats-strip-l{font-size:clamp(11px,1vw,12.5px);color:var(--n500);margin-top:3px}
 
-/* ── CTA banner (below fold) ── */
+/* CTA BANNER */
 .cta-banner{position:relative;overflow:hidden;padding:clamp(40px,8vw,64px) 0;background:linear-gradient(135deg,var(--brand),#62130a)}
 .cta-banner-bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.35}
 .cta-banner-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(98,19,10,.92),rgba(139,36,29,.88))}
 .cta-banner-content{position:relative;z-index:1;text-align:center}
-.cta-banner-content h2{color:#fff;font-size:clamp(1.6rem,3.5vw,2.1rem);margin-bottom:12px;font-weight:800}
+.cta-banner-content h2{color:#fff;font-size:clamp(1.5rem,3.5vw,2.1rem);margin-bottom:12px;font-weight:800}
 .cta-banner-content p{color:rgba(255,255,255,.78);font-size:1.05rem;margin-bottom:28px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6}
 .cta-banner-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 
-/* ── Other Vendors tab subsections ── */
+/* OTHER VENDORS tab subsection styles */
 .ov-subsection-head h3{font-size:16.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
 .ov-subsection-head p{font-size:13.5px;color:var(--n500);margin-bottom:4px;line-height:1.6}
 .ov-card-img{width:100%;height:120px;border-radius:var(--r-sm);overflow:hidden;margin-bottom:12px;background:var(--n50)}
 .ov-card-img img{width:100%;height:100%;object-fit:cover}
 
-/* ───────────────────────────────────────────
-   RESPONSIVE BREAKPOINTS — AD STAGE
-   ─────────────────────────────────────────── */
+/* ───────────────────────────────────────────────────────────────
+   BREAKPOINTS — AD STAGE
+   ─────────────────────────────────────────────────────────────── */
 
-/* Tablet (1025px → 769px)
-   Hide search card — give the full width to the ad image.
-   aspect-ratio still drives height automatically. */
+/* Hide search card on tablet and phone.
+   No height change needed — aspect-ratio still drives proportional sizing. */
 @media(max-width:1024px){
   .ad-search-card{display:none}
-  /* No height override needed — aspect-ratio:8/3 handles it:
-     at 768px → 288px tall, at 1024px → 384px tall. Both correct. */
 }
 
-/* Small tablet / large phone (768px → 481px)
-   Tighten progress bar spacing. */
+/* Slightly tighter progress bar on small screens */
 @media(max-width:768px){
   .ad-progress{padding-top:20px}
-  .ad-progress-inner{padding:0 0 12px;gap:8px}
+  .ad-progress-inner{gap:8px}
   .ad-progress-track{max-width:none}
-  .ad-progress-btn{width:26px;height:26px}
-  .stats-strip-n{font-size:18px}
-  .stats-strip{padding:14px 0}
 }
 
-/* Phone portrait (≤480px)
-   At 375px wide, aspect-ratio:8/3 would give only ~141px height —
-   too short for any visual impact. Switch to a comfortable min-height
-   so the banner has enough presence on small screens.
-   We keep aspect-ratio but override max-height to allow it to be
-   taller than the ultra-wide guard. */
+/* Phone: min-height floor is the only override.
+   aspect-ratio:8/3 at 375px gives 141px — too short for a banner.
+   We keep the ratio but enforce a 220px floor so the section
+   has visual presence. object-fit:cover handles any slight mismatch. */
 @media(max-width:480px){
   .ad-stage{
-    /* On phones, let the image be at least 200px tall.
-       aspect-ratio is still respected if viewport is wider,
-       but min-height ensures it never collapses too small. */
-    min-height:200px;
-    max-height:280px;
-    /* Center the image vertically on phones */
-    aspect-ratio:unset;
-    height:clamp(200px,50vw,280px);
+    /* Remove max-height cap on phones — it's not needed below 480px
+       (max natural height here is only 180px at 480px wide) */
+    max-height:none;
   }
-  .ad-progress-num{font-size:10px}
+  .ad-progress-inner{gap:6px;padding-bottom:10px}
   .ad-progress-btn{width:24px;height:24px}
-  .ad-progress-inner{gap:6px;padding:0 0 10px}
 }
 
 

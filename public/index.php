@@ -34,44 +34,51 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
              loading="<?= $i===0?'eager':'lazy' ?>" decoding="async">
       <?php endforeach; ?>
     </div>
-    <div class="container ad-stage-inner" style="height:100%;padding-top:0;padding-bottom:0;">
-      <div class="ad-search-card">
-        <h3>Find Your Products</h3>
-        <form action="<?= BASE_URL ?>/public/products.php" method="GET">
-          <select name="industry" class="ad-search-field">
-            <option value="">All Industries</option>
-            <?php foreach($industries as $ind): ?>
-              <option value="<?= $ind['id'] ?>"><?= sH($ind['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-          <select name="category" class="ad-search-field">
-            <option value="">All Categories</option>
-            <?php foreach($categories as $cat): ?>
-              <option value="<?= $cat['id'] ?>"><?= sH($cat['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-          <input type="text" name="q" placeholder="Product, GSM, specification…" class="ad-search-field">
-          <button type="submit" class="ad-search-submit">Search Products</button>
-        </form>
-        <a href="<?= BASE_URL ?>/public/products.php" class="ad-search-advanced">Browse All Categories →</a>
+    <!-- Search card overlay: position:absolute fills .ad-stage, flex aligns card vertically -->
+    <div class="ad-stage-inner">
+      <div class="container">
+        <div class="ad-search-card">
+          <h3>Find Your Products</h3>
+          <form action="<?= BASE_URL ?>/public/products.php" method="GET">
+            <select name="industry" class="ad-search-field">
+              <option value="">All Industries</option>
+              <?php foreach($industries as $ind): ?>
+                <option value="<?= $ind['id'] ?>"><?= sH($ind['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <select name="category" class="ad-search-field">
+              <option value="">All Categories</option>
+              <?php foreach($categories as $cat): ?>
+                <option value="<?= $cat['id'] ?>"><?= sH($cat['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <input type="text" name="q" placeholder="Product, GSM, specification…" class="ad-search-field">
+            <button type="submit" class="ad-search-submit">Search Products</button>
+          </form>
+          <a href="<?= BASE_URL ?>/public/products.php" class="ad-search-advanced">Browse All Categories →</a>
+        </div>
       </div>
     </div>
     <?php if (count($heroBanners) > 1): ?>
+    <!-- Progress bar: position:absolute sticks to bottom of .ad-stage -->
     <div class="ad-progress" id="ad-progress">
-      <div class="container ad-progress-inner">
-        <span class="ad-progress-num" id="ad-progress-current">01</span>
-        <div class="ad-progress-track"><div class="ad-progress-fill" id="ad-progress-fill"></div></div>
-        <span class="ad-progress-num ad-progress-total"><?= sprintf('%02d', count($heroBanners)) ?></span>
-        <button class="ad-progress-btn" id="hero-prev" aria-label="Previous banner">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <button class="ad-progress-btn" id="hero-next" aria-label="Next banner">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
+      <div class="container">
+        <div class="ad-progress-inner">
+          <span class="ad-progress-num" id="ad-progress-current">01</span>
+          <div class="ad-progress-track"><div class="ad-progress-fill" id="ad-progress-fill"></div></div>
+          <span class="ad-progress-num ad-progress-total"><?= sprintf('%02d', count($heroBanners)) ?></span>
+          <button class="ad-progress-btn" id="hero-prev" aria-label="Previous banner">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="ad-progress-btn" id="hero-next" aria-label="Next banner">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
       </div>
     </div>
     <?php endif; ?>
   <?php else: ?>
+    <!-- Fallback: position:absolute fills same .ad-stage box, aspect-ratio still drives height -->
     <div class="ad-stage-empty">
       <div class="container">
         <div class="hero-label"><span class="hero-label-dot"></span>India's #1 B2B Paper Marketplace</div>
