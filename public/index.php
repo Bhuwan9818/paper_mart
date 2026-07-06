@@ -479,10 +479,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   .cat-card { width: 155px; min-height: 182px; }
 }
 
-.compare-group{
-  display:grid;
-  grid-template-columns: 1fr !important;
-}
 </style>
 
 <script>

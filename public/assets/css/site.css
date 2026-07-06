@@ -189,7 +189,7 @@ section.compact{padding:40px 0}
   border-radius:var(--r-lg);
   box-shadow:0 20px 56px rgba(0,0,0,.32),0 4px 16px rgba(0,0,0,.14);
   padding:clamp(16px,1.8vw,26px) clamp(14px,1.6vw,24px);
-  width:clamp(256px,22vw,320px);
+  width:clamp(270px,22vw,320px);
   flex-shrink:0;
 }
 /* Localised dark vignette behind the card only.
@@ -200,12 +200,12 @@ section.compact{padding:40px 0}
   position:absolute;
   z-index:-1;
   inset:-60px -60px -60px -60px;
-  background:radial-gradient(ellipse at 28% 35%,rgba(8,4,3,.44) 0%,transparent 65%);
+  /* background:radial-gradient(ellipse at 28% 35%,rgba(8,4,3,.44) 0%,transparent 65%); */
   pointer-events:none;
 }
 .ad-search-card h3{
   font-family:'Poppins',sans-serif;
-  font-size:clamp(14px,1.3vw,18px);
+  font-size:clamp(12px,1.3vw,18px);
   font-weight:700;
   color:var(--n900);
   margin-bottom:clamp(10px,1.1vw,14px);
@@ -213,7 +213,7 @@ section.compact{padding:40px 0}
 }
 .ad-search-field{
   width:100%;
-  padding:clamp(8px,0.8vw,11px) 13px;
+  padding:clamp(9px,0.8vw,11px) 13px;
   border:1.5px solid var(--n200);
   border-radius:var(--r-sm);
   background:var(--n50);
@@ -225,11 +225,11 @@ section.compact{padding:40px 0}
 .ad-search-field:focus{outline:none;border-color:var(--brand-2)}
 .ad-search-submit{
   width:100%;
-  padding:clamp(9px,0.9vw,12px);
+  padding:clamp(10px,0.9vw,12px);
   background:var(--brand);
   color:#fff;border:none;
   border-radius:var(--r-sm);
-  font-size:clamp(12.5px,1vw,14px);
+  font-size:clamp(12px,1vw,14px);
   font-weight:700;cursor:pointer;
   font-family:'DM Sans',sans-serif;
   margin-top:2px;
@@ -239,7 +239,7 @@ section.compact{padding:40px 0}
 .ad-search-advanced{
   display:block;text-align:center;
   margin-top:clamp(8px,0.9vw,12px);
-  font-size:11.5px;color:var(--n500);
+  font-size:12px;color:var(--n500);
   text-decoration:none;font-weight:600;
 }
 .ad-search-advanced:hover{color:var(--brand-2)}
@@ -356,8 +356,10 @@ section.compact{padding:40px 0}
 
 /* Hide search card on tablet and phone.
    No height change needed — aspect-ratio still drives proportional sizing. */
-@media(max-width:1024px){
+@media(max-width:600px){
   .ad-search-card{display:none}
+  
+ 
 }
 
 /* Slightly tighter progress bar on small screens */
@@ -365,6 +367,29 @@ section.compact{padding:40px 0}
   .ad-progress{padding-top:20px}
   .ad-progress-inner{gap:8px}
   .ad-progress-track{max-width:none}
+   .ad-search-advanced{
+    font-size: 8px;
+  }
+
+  .ad-search-submit{
+  padding:clamp(9px,0.9vw,12px);
+  font-size:clamp(8px,1vw,14px);
+}
+
+
+  .ad-search-field{
+  padding:clamp(5px,0.8vw,11px) 5px;
+  font-size:clamp(8px,1vw,13.5px);
+}
+
+.ad-search-card h3{
+  font-size:clamp(10px,1.3vw,18px);
+}
+
+.ad-search-card{
+  padding:clamp(12px,1.8vw,26px) clamp(10px,1.6vw,24px);
+  width:clamp(200px,22vw,320px);
+}
 }
 
 /* Phone: min-height floor is the only override.
@@ -1218,6 +1243,11 @@ section.compact{padding:40px 0}
   .hero-ctas { flex-direction: column; align-items: stretch; }
   .hero-ctas .btn { justify-content: center; }
   .trust-item:nth-child(n+4) { display: none; }
+
+  .compare-group{
+  display:grid;
+  grid-template-columns: 1fr !important;
+}
 
   /* Products grid: 2 cols still */
   .products-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
