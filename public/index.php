@@ -13,11 +13,32 @@ $totalVends  = $pdo->query("SELECT COUNT(*) FROM users WHERE role='vendor' AND s
 $totalEnqs   = $pdo->query("SELECT COUNT(*) FROM web_enquiries")->fetchColumn();
 $categories  = $pdo->query("SELECT c.*,i.name AS iname,(SELECT COUNT(*) FROM products WHERE category_id=c.id AND status='active') AS prod_count FROM categories c JOIN industries i ON i.id=c.industry_id WHERE c.status=1 ORDER BY prod_count DESC LIMIT 12")->fetchAll();
 
-// Active banners for the hero ad carousel
+// Hero carousel — pulls running banner_ads whose time slot window is currently active.
+// Falls back to empty array (shows plain gradient hero) if:
+//   a) migration_ads.sql hasn't been run yet (table doesn't exist), OR
+//   b) no ads are currently running in an active slot window
 try {
-    $heroBanners = $pdo->query("SELECT * FROM banners WHERE status='active' ORDER BY sort_order ASC, id ASC")->fetchAll();
+    $heroBanners = $pdo->query(
+        "SELECT ba.*, u.company AS vendor_company,
+                s.name AS slot_name, s.start_time, s.end_time
+         FROM banner_ads ba
+         JOIN users u      ON u.id  = ba.vendor_id
+         JOIN ad_slots s   ON s.id  = ba.slot_id
+         WHERE ba.status   = 'running'
+           AND s.is_active = 1
+           AND ba.start_date <= CURDATE()
+           AND ba.end_date   >= CURDATE()
+           AND CURTIME() BETWEEN s.start_time AND s.end_time
+         ORDER BY ba.sort_order ASC, ba.id ASC
+         LIMIT 10"
+    )->fetchAll();
+    // Increment impression counter for all currently displayed ads
+    if ($heroBanners) {
+        $ids = implode(',', array_map(fn($b) => (int)$b['id'], $heroBanners));
+        $pdo->query("UPDATE banner_ads SET impressions = impressions + 1 WHERE id IN($ids)");
+    }
 } catch (Exception $e) {
-    $heroBanners = []; // banners table not yet migrated — falls back to plain hero
+    $heroBanners = []; // migration_ads.sql not yet run — graceful fallback
 }
 
 $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'🗂️','Mono Carton'=>'🎁','Woven Fabric'=>'🧵','Non-Woven Fabric'=>'🎀','Industrial Adhesives'=>'🧴','Surface Coatings'=>'🖌️'];
@@ -479,6 +500,10 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   .cat-card { width: 155px; min-height: 182px; }
 }
 
+.compare-group{
+  display:grid;
+  grid-template-columns: 1fr !important;
+}
 </style>
 
 <script>

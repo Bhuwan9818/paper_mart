@@ -32,6 +32,7 @@ $vendorNav = [
     ['icon'=>'🚀', 'label'=>'Performance',        'href'=>BASE_URL.'/vendor/performance.php',   'page'=>'performance'],
     ['section'=>'Account'],
     ['icon'=>'💳', 'label'=>'Subscription',      'href'=>BASE_URL.'/vendor/subscription.php',  'page'=>'subscription'],
+    ['icon'=>'🎯', 'label'=>'Banner Ads',         'href'=>BASE_URL.'/vendor/ads.php',           'page'=>'ads'],
     // ['icon'=>'👤', 'label'=>'My Profile',         'href'=>BASE_URL.'/vendor/profile.php',       'page'=>'profile'],
     ['icon'=>'🏢', 'label'=>'Business Profile',    'href'=>BASE_URL.'/vendor/business-profile.php','page'=>'business-profile'],
 ];
@@ -42,7 +43,6 @@ $adminNav = [
     ['icon'=>'🏪','label'=>'Vendors',         'href'=>BASE_URL.'/admin/vendors.php',        'page'=>'vendors'],
     ['icon'=>'👥','label'=>'Customers',       'href'=>BASE_URL.'/admin/customers.php',      'page'=>'customers'],
     ['section'=>'Catalogue'],
-    ['icon'=>'🖼️','label'=>'Hero Banners',    'href'=>BASE_URL.'/admin/banners.php',       'page'=>'banners'],
     ['icon'=>'🏭','label'=>'Industries',      'href'=>BASE_URL.'/admin/industries.php',     'page'=>'industries'],
     ['icon'=>'🗂️','label'=>'Categories',      'href'=>BASE_URL.'/admin/categories.php',    'page'=>'categories'],
     ['icon'=>'🔖','label'=>'Product Types',   'href'=>BASE_URL.'/admin/product-types.php', 'page'=>'product-types'],
@@ -56,6 +56,7 @@ $adminNav = [
     ['section'=>'Finance'],
     ['icon'=>'💰','label'=>'Payments',        'href'=>BASE_URL.'/admin/payments.php',      'page'=>'payments'],
     ['icon'=>'💳','label'=>'Subscriptions',   'href'=>BASE_URL.'/admin/subscriptions.php', 'page'=>'subscriptions'],
+    ['icon'=>'🎯','label'=>'Ad Management',   'href'=>BASE_URL.'/admin/ads.php',           'page'=>'ads'],
     ['section'=>'Intelligence'],
     ['icon'=>'💬', 'label'=>'Chatbot Manager', 'href'=>BASE_URL.'/admin/chatbot.php?tab=intents', 'page'=>'chatbot'],
     ['icon'=>'📈','label'=>'Analytics',       'href'=>BASE_URL.'/admin/analytics.php',     'page'=>'analytics'],
