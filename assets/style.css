@@ -347,6 +347,24 @@ body {
   color: #fca5a5;
 }
 
+
+/* ── MODAL ── */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.open{display:flex}
+.modal{background:#fff;border-radius:var(--r-lg);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:modal-in .2s ease}
+@keyframes modal-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--n200);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1}
+.modal-header h3{font-size:18px;font-weight:700}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--n400);line-height:1;padding:0}
+.modal-close:hover{color:var(--n900)}
+.modal-body{padding:24px}
+.form-group{margin-bottom:15px}
+.form-label{display:block;font-size:13px;font-weight:600;color:var(--n700);margin-bottom:5px}
+.form-input{width:100%;padding:10px 13px;border:1.5px solid var(--n200);border-radius:var(--r-sm);font-size:14px;font-family:'DM Sans',sans-serif;transition:var(--t)}
+.form-input:focus{outline:none;border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(139,36,29,.1)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-required{color:var(--red)}
+
 /* ══ MAIN CONTENT ═════════════════════════════════════════ */
 .main {
   margin-left: 256px;
