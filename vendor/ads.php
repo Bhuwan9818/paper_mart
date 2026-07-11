@@ -6,7 +6,7 @@ requireRoleStrict('vendor');
 $user = currentUser();
 $uid  = $user['id'];
 
-// ─── POST: Submit a new ad booking ───────────────────────────
+// ─── POST ACTIONS ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $action = $_POST['action'] ?? '';
@@ -20,431 +20,378 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $linkUrl    = trim($_POST['link_url'] ?? '');
         $buttonText = trim($_POST['button_text'] ?? '');
         $payRef     = trim($_POST['payment_ref'] ?? '');
-
-        // Validate
         $errors = [];
         if (!$packageId) $errors[] = 'Please select a package.';
         if (!$slotId)    $errors[] = 'Please select a time slot.';
-        if (!$startDate || strtotime($startDate) < strtotime('today'))
-            $errors[] = 'Start date must be today or a future date.';
-        if (empty($_FILES['image']['name']))
-            $errors[] = 'Please upload a banner image.';
-
+        if (!$startDate || strtotime($startDate) < strtotime('today')) $errors[] = 'Start date must be today or a future date.';
+        if (empty($_FILES['image']['name'])) $errors[] = 'Please upload a banner image.';
+        $pkg = null;
         if (!$errors) {
-            // Fetch package for end_date calculation
-            $pkg = $pdo->prepare("SELECT * FROM ad_packages WHERE id=? AND is_active=1");
-            $pkg->execute([$packageId]); $pkg = $pkg->fetch();
-            if (!$pkg) $errors[] = 'Invalid package selected.';
+            $s = $pdo->prepare("SELECT * FROM ad_packages WHERE id=? AND is_active=1"); $s->execute([$packageId]); $pkg=$s->fetch();
+            if (!$pkg) $errors[] = 'Invalid package.';
         }
-
         if (!$errors) {
-            // Check slot capacity
-            $slotRow = $pdo->prepare("SELECT * FROM ad_slots WHERE id=? AND is_active=1");
-            $slotRow->execute([$slotId]); $slotRow = $slotRow->fetch();
-            if (!$slotRow) {
-                $errors[] = 'Invalid time slot selected.';
-            } else {
-                // Count ads already approved/running in this slot for this date range
-                $endDate = date('Y-m-d', strtotime($startDate . ' +' . ($pkg['duration_days']-1) . ' days'));
-                $overlap = $pdo->prepare(
-                    "SELECT COUNT(*) FROM banner_ads
-                     WHERE slot_id=? AND status IN('approved','running','pending')
-                       AND start_date <= ? AND end_date >= ?"
-                );
-                $overlap->execute([$slotId, $endDate, $startDate]);
-                if ($overlap->fetchColumn() >= $slotRow['max_concurrent']) {
-                    $errors[] = 'This slot is fully booked for your selected dates. Please choose a different slot or start date.';
-                }
+            $sr = $pdo->prepare("SELECT * FROM ad_slots WHERE id=? AND is_active=1"); $sr->execute([$slotId]); $sr=$sr->fetch();
+            if (!$sr) { $errors[] = 'Invalid slot.'; } else {
+                $endDate = date('Y-m-d', strtotime($startDate.' +'.($pkg['duration_days']-1).' days'));
+                $ov = $pdo->prepare("SELECT COUNT(*) FROM banner_ads WHERE slot_id=? AND status IN('approved','running','pending') AND start_date<=? AND end_date>=?");
+                $ov->execute([$slotId,$endDate,$startDate]);
+                if ($ov->fetchColumn() >= $sr['max_concurrent']) $errors[] = 'This slot is fully booked for your selected dates. Please try different dates or a different slot.';
             }
         }
-
         if (!$errors) {
-            // Upload banner image
-            $imageName = uploadImage($_FILES['image'], 'ad');
-            if (!$imageName) {
-                $errors[] = 'Image upload failed. Use JPG/PNG/WebP, max 5MB. Recommended size: 1600×600px.';
-            }
+            $imgName = uploadImage($_FILES['image'], 'ad');
+            if (!$imgName) $errors[] = 'Image upload failed. Please use JPG/PNG/WebP under 5MB.';
         }
-
         if (!$errors) {
-            $endDate = date('Y-m-d', strtotime($startDate . ' +' . ($pkg['duration_days']-1) . ' days'));
-            $pdo->prepare(
-                "INSERT INTO banner_ads (vendor_id,package_id,slot_id,image,title,subtitle,link_url,button_text,start_date,end_date,status)
-                 VALUES (?,?,?,?,?,?,?,?,'$startDate','$endDate','pending')"
-            )->execute([$uid,$packageId,$slotId,$imageName,$title,$subtitle,$linkUrl,$buttonText]);
+            $endDate = date('Y-m-d', strtotime($startDate.' +'.($pkg['duration_days']-1).' days'));
+            $pdo->prepare("INSERT INTO banner_ads(vendor_id,package_id,slot_id,image,title,subtitle,link_url,button_text,start_date,end_date,status)VALUES(?,?,?,?,?,?,?,?,'$startDate','$endDate','pending')")->execute([$uid,$packageId,$slotId,$imgName,$title,$subtitle,$linkUrl,$buttonText]);
             $adId = $pdo->lastInsertId();
-
-            // Create pending payment record
-            $pdo->prepare(
-                "INSERT INTO ad_payments (ad_id,vendor_id,package_id,amount,currency,payment_method,payment_ref,status)
-                 VALUES (?,?,?,?,'INR','manual',?,'pending')"
-            )->execute([$adId,$uid,$packageId,$pkg['price'],$payRef]);
-
-            flash('success','Ad booking submitted! Complete your payment to activate the ad. Our team will review and approve it shortly.');
+            $pdo->prepare("INSERT INTO ad_payments(ad_id,vendor_id,package_id,amount,currency,payment_method,payment_ref,status)VALUES(?,?,?,?,'INR','manual',?,'pending')")->execute([$adId,$uid,$packageId,$pkg['price'],$payRef]);
+            flash('success','Ad booking submitted! Make your payment and our team will activate it within 24 hours.');
             header('Location: ads.php'); exit;
         }
-
-        // Store errors to show below form
         foreach ($errors as $e) flash('error', $e);
         header('Location: ads.php?tab=book'); exit;
     }
 
     if ($action === 'update_pay_ref') {
-        $adId  = (int)$_POST['ad_id'];
-        $ref   = trim($_POST['payment_ref'] ?? '');
-        if ($ref) {
-            // Only update pending payments for this vendor's ad
-            $pdo->prepare(
-                "UPDATE ad_payments SET payment_ref=?
-                 WHERE ad_id=? AND vendor_id=? AND status='pending'"
-            )->execute([$ref, $adId, $uid]);
-            flash('success', 'Payment reference submitted. Our team will verify within 24 hours.');
-        } else {
-            flash('error', 'Please enter a valid transaction reference.');
-        }
+        $adId=(int)$_POST['ad_id']; $ref=trim($_POST['payment_ref']??'');
+        if ($ref) { $pdo->prepare("UPDATE ad_payments SET payment_ref=? WHERE ad_id=? AND vendor_id=? AND status='pending'")->execute([$ref,$adId,$uid]); flash('success','Reference submitted. We\'ll verify within 24 hours.'); }
+        else flash('error','Please enter a valid reference.');
         header('Location: ads.php'); exit;
     }
 
     if ($action === 'cancel_ad') {
-        $adId = (int)$_POST['ad_id'];
-        // Only allow cancel if status is pending/approved (not running)
-        $pdo->prepare(
-            "UPDATE banner_ads SET status='cancelled'
-             WHERE id=? AND vendor_id=? AND status IN('pending','approved')"
-        )->execute([$adId, $uid]);
-        flash('success', 'Ad booking cancelled.');
+        $adId=(int)$_POST['ad_id'];
+        $pdo->prepare("UPDATE banner_ads SET status='cancelled' WHERE id=? AND vendor_id=? AND status IN('pending','approved')")->execute([$adId,$uid]);
+        flash('success','Ad booking cancelled.');
         header('Location: ads.php'); exit;
     }
 }
 
-$tab = $_GET['tab'] ?? 'my-ads'; // my-ads | book
+$tab = $_GET['tab'] ?? 'my-ads';
+$packages = $pdo->query("SELECT * FROM ad_packages WHERE is_active=1 ORDER BY sort_order,price")->fetchAll();
+$slots    = $pdo->query("SELECT * FROM ad_slots WHERE is_active=1 ORDER BY sort_order,start_time")->fetchAll();
+$myAds    = $pdo->prepare("SELECT ba.*,p.name AS package_name,p.duration_days,p.price AS package_price,s.name AS slot_name,s.start_time,s.end_time,(SELECT status FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_status,(SELECT payment_ref FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_ref,(SELECT id FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_id FROM banner_ads ba JOIN ad_packages p ON p.id=ba.package_id JOIN ad_slots s ON s.id=ba.slot_id WHERE ba.vendor_id=? ORDER BY ba.created_at DESC");
+$myAds->execute([$uid]); $myAds=$myAds->fetchAll();
 
-// ─── DATA ────────────────────────────────────────────────────
-$packages = $pdo->query("SELECT * FROM ad_packages WHERE is_active=1 ORDER BY sort_order, price")->fetchAll();
-$slots    = $pdo->query("SELECT * FROM ad_slots WHERE is_active=1 ORDER BY sort_order, start_time")->fetchAll();
-
-// Vendor's own ad bookings with payment info
-$myAds = $pdo->prepare(
-    "SELECT ba.*, p.name AS package_name, p.duration_days, p.price AS package_price,
-            s.name AS slot_name, s.start_time, s.end_time,
-            (SELECT status     FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_status,
-            (SELECT payment_ref FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_ref,
-            (SELECT id          FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_id
-     FROM banner_ads ba
-     JOIN ad_packages p ON p.id=ba.package_id
-     JOIN ad_slots s    ON s.id=ba.slot_id
-     WHERE ba.vendor_id=?
-     ORDER BY ba.created_at DESC"
-);
-$myAds->execute([$uid]); $myAds = $myAds->fetchAll();
-
-// Slot availability helper
-function slotAvailability($pdo, $slotId, $startDate, $endDate, $maxConcurrent) {
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM banner_ads
-         WHERE slot_id=? AND status IN('approved','running','pending')
-           AND start_date <= ? AND end_date >= ?"
-    );
-    $stmt->execute([$slotId, $endDate, $startDate]);
-    $used = (int)$stmt->fetchColumn();
-    return $maxConcurrent - $used;
-}
-
-$pageTitle = 'My Ads'; $activePage = 'ads';
+$pageTitle='Banner Ads'; $activePage='ads';
 include __DIR__ . '/../includes/head.php';
 ?>
+<style>
+/* ── VENDOR ADS — premium UI ────────────────────── */
+.ads-tabs{display:flex;gap:0;margin-bottom:24px;background:var(--cream-light);border-radius:12px;padding:4px;border:1px solid var(--border-light)}
+.ads-tab{flex:1;text-align:center;padding:10px 12px;font-size:13.5px;font-weight:600;border-radius:9px;text-decoration:none;color:var(--text-muted);transition:var(--transition)}
+.ads-tab.active{background:var(--crimson);color:#fff;box-shadow:0 2px 8px rgba(139,36,29,.25)}
+.ads-tab:hover:not(.active){background:var(--cream);color:var(--crimson)}
+.status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;letter-spacing:.02em}
+.status-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.sp-running{background:#dcfce7;color:#16a34a}.sp-pending{background:#fef3c7;color:#d97706}
+.sp-approved{background:#dbeafe;color:#2563eb}.sp-rejected{background:#fee2e2;color:#dc2626}
+.sp-paused{background:#ede9fe;color:#7c3aed}.sp-completed{background:#f1f5f9;color:#64748b}
+.sp-cancelled{background:#fee2e2;color:#dc2626}.sp-paid{background:#dcfce7;color:#16a34a}
+.sp-failed{background:#fee2e2;color:#dc2626}.sp-refunded{background:#ede9fe;color:#7c3aed}
+/* Ad listing card */
+.ad-list-card{background:var(--white);border:1px solid var(--border-light);border-radius:var(--radius-lg);overflow:hidden;transition:var(--transition);position:relative}
+.ad-list-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:4px}
+.ad-list-card.running::before{background:linear-gradient(180deg,#16a34a,#34d399)}
+.ad-list-card.pending::before{background:linear-gradient(180deg,#d97706,#fbbf24)}
+.ad-list-card.approved::before{background:linear-gradient(180deg,#2563eb,#60a5fa)}
+.ad-list-card.rejected::before,.ad-list-card.cancelled::before{background:linear-gradient(180deg,#dc2626,#f87171)}
+.ad-list-card.completed::before{background:linear-gradient(180deg,#64748b,#94a3b8)}
+.ad-list-card:hover{box-shadow:var(--shadow-md)}
+.ad-card-inner{display:grid;grid-template-columns:160px 1fr auto;gap:16px;align-items:center;padding:16px 16px 16px 20px}
+.ad-thumb{width:160px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border-light);display:block}
+.ad-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+.ad-meta-item{font-size:11.5px;color:var(--text-muted)}
+.ad-meta-item strong{color:var(--text);display:block;font-size:12.5px}
+.days-left-badge{display:inline-flex;align-items:center;gap:5px;background:var(--crimson-light);color:var(--crimson);border-radius:100px;padding:3px 10px;font-size:11px;font-weight:700}
+/* Package selector */
+.pkg-select-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:6px}
+.pkg-select-card{border:2px solid var(--border-light);border-radius:12px;padding:16px 14px;cursor:pointer;transition:var(--transition);position:relative;text-align:center}
+.pkg-select-card:hover{border-color:var(--crimson-light);box-shadow:var(--shadow-sm)}
+.pkg-select-card.selected{border-color:var(--crimson);background:var(--crimson-light)}
+.pkg-select-card.selected::after{content:'✓';position:absolute;top:8px;right:10px;font-size:12px;font-weight:800;color:var(--crimson)}
+.pkg-price{font-family:'Poppins',sans-serif;font-size:26px;font-weight:800;color:var(--crimson)}
+.pkg-name{font-size:13px;font-weight:600;margin:4px 0 2px}
+.pkg-days-tag{font-size:11.5px;color:var(--text-muted)}
+/* Slot card */
+.slot-select-card{border:2px solid var(--border-light);border-radius:10px;padding:14px;cursor:pointer;transition:var(--transition);position:relative}
+.slot-select-card:hover{border-color:var(--crimson-light)}
+.slot-select-card.selected{border-color:var(--crimson);background:var(--crimson-light)}
+.slot-select-card.selected::after{content:'✓';position:absolute;top:8px;right:10px;font-size:12px;font-weight:800;color:var(--crimson)}
+.slot-select-card.full{opacity:.5;pointer-events:none}
+.slot-time-label{font-family:'Poppins',sans-serif;font-size:13.5px;font-weight:700;color:var(--crimson)}
+.slot-fill-mini{height:4px;border-radius:2px;background:var(--border-light);margin:8px 0;overflow:hidden}
+.slot-fill-mini-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--crimson),var(--crimson-mid))}
+/* Steps */
+.step-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--crimson);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-title{font-size:14px;font-weight:700;color:var(--text)}
+.step-section{margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--border-light)}
+.step-section:last-child{border-bottom:none;margin-bottom:0}
+/* Banner preview */
+.banner-preview-box{width:100%;aspect-ratio:8/3;border-radius:10px;overflow:hidden;border:2px dashed var(--border-light);background:var(--cream-light);display:flex;align-items:center;justify-content:center;transition:.2s;margin-top:10px}
+.banner-preview-box img{width:100%;height:100%;object-fit:cover}
+.banner-preview-box.has-img{border-style:solid;border-color:var(--border-light)}
+/* Payment box */
+.payment-box{background:linear-gradient(135deg,var(--gold-light),var(--cream-light));border:1px solid var(--gold-dark);border-radius:12px;padding:18px 20px}
+.payment-amount{font-family:'Poppins',sans-serif;font-size:32px;font-weight:800;color:var(--crimson);line-height:1}
+.bank-details{background:rgba(255,255,255,.7);border:1px solid var(--cream-dark);border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.8;margin:12px 0}
+/* Right sidebar info */
+.info-card{background:var(--white);border:1px solid var(--border-light);border-radius:var(--radius-lg);overflow:hidden}
+.info-card-header{background:linear-gradient(135deg,var(--crimson),var(--crimson-mid));color:#fff;padding:14px 18px;font-size:13.5px;font-weight:700}
+.info-card-body{padding:16px 18px}
+.how-step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start}
+.how-step:last-child{margin-bottom:0}
+.how-num{width:24px;height:24px;border-radius:50%;background:var(--crimson);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.slot-avail-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border-light);border-radius:8px;margin-bottom:8px}
+.slot-avail-row:last-child{margin-bottom:0}
+/* Responsive */
+@media(max-width:900px){.ad-card-inner{grid-template-columns:1fr;gap:10px}.ad-thumb{width:100%;height:auto;aspect-ratio:8/3}}
+@media(max-width:768px){
+  .ads-tabs{gap:4px;flex-wrap:wrap}
+  .ads-tab{flex:none;width:calc(50% - 2px)}
+  .book-layout{flex-direction:column!important}
+  .book-sidebar{width:100%!important}
+  .content{padding:16px}
+  .pkg-select-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .pkg-select-grid{grid-template-columns:1fr}
+  .ads-tab{font-size:12px;padding:8px 4px}
+}
+</style>
+
 <div class="topbar">
   <div class="topbar-left">
     <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
-    <h1>🎯 Banner Ads</h1>
+    <h1>Banner Ads</h1>
   </div>
   <div class="topbar-right">
     <a href="?tab=book" class="btn btn-primary btn-sm">+ Book New Ad</a>
+    <div class="topbar-avatar"><?= avatarLetter($user['name']) ?></div>
   </div>
 </div>
 <div class="content">
   <?= showFlash() ?>
 
   <!-- Tabs -->
-  <div style="display:flex;gap:6px;margin-bottom:20px;border-bottom:2px solid var(--border)">
-    <a href="?tab=my-ads" style="padding:10px 18px;font-size:13.5px;font-weight:600;text-decoration:none;border-radius:8px 8px 0 0;<?= $tab==='my-ads'?'background:var(--brand);color:#fff':'color:var(--text-muted)' ?>">📋 My Ads</a>
-    <a href="?tab=book"   style="padding:10px 18px;font-size:13.5px;font-weight:600;text-decoration:none;border-radius:8px 8px 0 0;<?= $tab==='book'  ?'background:var(--brand);color:#fff':'color:var(--text-muted)' ?>">➕ Book New Ad</a>
+  <div class="ads-tabs">
+    <a href="?tab=my-ads" class="ads-tab <?= $tab==='my-ads'?'active':'' ?>">📋 My Ads</a>
+    <a href="?tab=book"   class="ads-tab <?= $tab==='book'  ?'active':'' ?>">➕ Book New Ad</a>
   </div>
 
   <?php if ($tab === 'my-ads'): ?>
-  <!-- ═══════ MY ADS TAB ═══════ -->
+  <!-- ═══════ MY ADS ═══════ -->
   <?php if (!$myAds): ?>
     <div class="empty-state">
-      <div class="empty-state-icon">🖼️</div>
+      <div class="empty-state-icon">🎯</div>
       <h3>No Ad Bookings Yet</h3>
-      <p>Book your first banner ad to promote your products on the homepage carousel.</p>
-      <a href="?tab=book" class="btn btn-primary" style="margin-top:12px">+ Book a Banner Ad</a>
+      <p>Book your first banner ad to showcase your products on the homepage carousel.</p>
+      <a href="?tab=book" class="btn btn-primary" style="margin-top:14px">+ Book a Banner Ad</a>
     </div>
   <?php else: ?>
-  <div class="card" style="padding:0;overflow:hidden">
-    <div class="table-wrapper">
-      <table>
-        <thead><tr>
-          <th>Banner</th><th>Slot</th><th>Schedule</th>
-          <th>Package</th><th>Payment</th><th>Status</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-        <?php foreach($myAds as $ad): ?>
-        <?php
-        $statusColor = match($ad['status']) {
-          'running'   => '#22c55e', 'approved'  => '#3b82f6',
-          'pending'   => '#f59e0b', 'rejected'  => '#ef4444',
-          'paused'    => '#8b5cf6', 'completed' => '#6b7280',
-          'cancelled' => '#ef4444', default     => '#6b7280'
-        };
-        $payColor = match($ad['pay_status']) {
-          'paid'=>'#22c55e','failed'=>'#ef4444','refunded'=>'#6366f1',default=>'#f59e0b'
-        };
-        $daysLeft = max(0, (int)((strtotime($ad['end_date']) - time()) / 86400));
-        ?>
-        <tr>
-          <td>
-            <img src="<?= UPLOAD_URL.sanitize($ad['image']) ?>"
-                 style="width:90px;height:34px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
-            <?php if ($ad['title']): ?><div style="font-size:11px;margin-top:3px;color:var(--text-muted)"><?= sanitize($ad['title']) ?></div><?php endif; ?>
-          </td>
-          <td style="font-size:12.5px">
-            <strong><?= sanitize($ad['slot_name']) ?></strong><br>
-            <span style="color:var(--text-muted)"><?= substr($ad['start_time'],0,5) ?>–<?= substr($ad['end_time'],0,5) ?></span>
-          </td>
-          <td style="font-size:12px">
-            <?= date('d M', strtotime($ad['start_date'])) ?> – <?= date('d M Y', strtotime($ad['end_date'])) ?>
-            <br><?= $ad['duration_days'] ?> days
-            <?php if ($ad['status']==='running'): ?>
-              <div style="color:#22c55e;font-weight:600;font-size:11px"><?= $daysLeft ?> days left</div>
-            <?php endif; ?>
-          </td>
-          <td style="font-size:12.5px">
-            <?= sanitize($ad['package_name']) ?><br>
-            <strong style="color:var(--brand)">₹<?= number_format($ad['package_price'],2) ?></strong>
-          </td>
-          <td>
-            <span class="badge" style="background:<?= $payColor ?>20;color:<?= $payColor ?>;font-size:10.5px">
-              <?= ucfirst($ad['pay_status'] ?? 'pending') ?>
-            </span>
-            <?php if ($ad['pay_ref']): ?><div style="font-size:10px;color:var(--text-muted)">Ref: <?= sanitize($ad['pay_ref']) ?></div><?php endif; ?>
-            <?php if (($ad['pay_status']??'pending') === 'pending'): ?>
-              <button class="btn btn-xs btn-outline" style="margin-top:4px" onclick="openPayModal(<?= $ad['id'] ?>,<?= $ad['pay_id']?:0 ?>,<?= $ad['package_price'] ?>,'<?= addslashes($ad['package_name']) ?>')">Add Ref</button>
-            <?php endif; ?>
-          </td>
-          <td>
-            <span class="badge" style="background:<?= $statusColor ?>20;color:<?= $statusColor ?>;font-size:11px">
-              <?= ucfirst($ad['status']) ?>
-            </span>
-            <?php if ($ad['admin_note'] && in_array($ad['status'],['rejected','paused'])): ?>
-              <div style="font-size:10.5px;color:#ef4444;margin-top:3px">Note: <?= sanitize($ad['admin_note']) ?></div>
-            <?php endif; ?>
-          </td>
-          <td>
-            <div class="td-actions">
-              <a href="<?= UPLOAD_URL.sanitize($ad['image']) ?>" target="_blank" class="btn btn-outline btn-xs">🖼️ Preview</a>
-              <?php if (in_array($ad['status'],['pending','approved'])): ?>
-              <form method="POST" style="display:inline" onsubmit="return confirm('Cancel this ad booking?')">
-                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                <input type="hidden" name="action" value="cancel_ad">
-                <input type="hidden" name="ad_id" value="<?= $ad['id'] ?>">
-                <button type="submit" class="btn btn-danger btn-xs">Cancel</button>
-              </form>
-              <?php endif; ?>
-            </div>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
+    <div style="display:flex;flex-direction:column;gap:12px">
+    <?php foreach($myAds as $ad):
+      $sc = $ad['status']; $pst=$ad['pay_status']??'pending';
+      $daysLeft = $sc==='running' ? max(0,(int)((strtotime($ad['end_date'])-time())/86400)) : null;
+    ?>
+    <div class="ad-list-card <?= sanitize($sc) ?>">
+      <div class="ad-card-inner">
+        <img src="<?= UPLOAD_URL.sanitize($ad['image']) ?>" class="ad-thumb" alt="">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+            <strong style="font-size:14px"><?= sanitize($ad['package_name']) ?></strong>
+            <span class="status-pill sp-<?= sanitize($sc) ?>"><?= ucfirst($sc) ?></span>
+            <span class="status-pill sp-<?= sanitize($pst) ?>"><?= ucfirst($pst) ?> payment</span>
+            <?php if ($daysLeft!==null): ?><span class="days-left-badge">⏱ <?= $daysLeft ?> days left</span><?php endif; ?>
+          </div>
+          <div class="ad-meta">
+            <div class="ad-meta-item"><strong><?= sanitize($ad['slot_name']) ?></strong><?= substr($ad['start_time'],0,5)?>–<?=substr($ad['end_time'],0,5)?></div>
+            <div class="ad-meta-item"><strong>Schedule</strong><?= date('d M',strtotime($ad['start_date'])) ?> – <?= date('d M Y',strtotime($ad['end_date'])) ?></div>
+            <div class="ad-meta-item"><strong>Amount</strong>₹<?= number_format($ad['package_price'],0) ?></div>
+            <?php if($ad['pay_ref']): ?><div class="ad-meta-item"><strong>Ref</strong><?= sanitize($ad['pay_ref']) ?></div><?php endif; ?>
+          </div>
+          <?php if ($ad['admin_note'] && in_array($sc,['rejected','paused'])): ?>
+          <div style="margin-top:8px;font-size:12px;color:#dc2626;background:#fee2e2;border-radius:6px;padding:6px 10px">📌 <?= sanitize($ad['admin_note']) ?></div>
+          <?php endif; ?>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;min-width:90px">
+          <?php if (($ad['pay_status']??'pending')==='pending'): ?>
+          <button class="btn btn-primary btn-sm" onclick="openPayRefModal(<?=$ad['id']?>,<?=$ad['pay_id']?:0?>,<?=$ad['package_price']?>,'<?=addslashes($ad['package_name'])?>')">💳 Pay Ref</button>
+          <?php endif; ?>
+          <?php if(in_array($sc,['pending','approved'])): ?>
+          <form method="POST" onsubmit="return confirm('Cancel this booking?')">
+            <input type="hidden" name="csrf_token" value="<?=csrfToken()?>">
+            <input type="hidden" name="action" value="cancel_ad">
+            <input type="hidden" name="ad_id" value="<?=$ad['id']?>">
+            <button type="submit" class="btn btn-outline btn-sm">✕ Cancel</button>
+          </form>
+          <?php endif; ?>
+          <a href="<?=UPLOAD_URL.sanitize($ad['image'])?>" target="_blank" class="btn btn-outline btn-sm">🖼️ View</a>
+        </div>
+      </div>
     </div>
-  </div>
+    <?php endforeach; ?>
+    </div>
   <?php endif; ?>
 
   <?php elseif ($tab === 'book'): ?>
-  <!-- ═══════ BOOK NEW AD TAB ═══════ -->
-  <div style="display:grid;grid-template-columns:1fr 380px;gap:22px;align-items:start">
+  <!-- ═══════ BOOK NEW AD ═══════ -->
+  <div class="book-layout" style="display:flex;gap:22px;align-items:flex-start">
 
-    <!-- Booking form -->
-    <div class="card">
-      <div class="card-header"><h2>Book a Banner Ad</h2></div>
-      <div class="card-body">
-        <form method="POST" enctype="multipart/form-data">
-          <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-          <input type="hidden" name="action" value="book_ad">
+    <!-- Main form -->
+    <div style="flex:1;min-width:0">
+      <form method="POST" enctype="multipart/form-data" id="book-form">
+        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+        <input type="hidden" name="action" value="book_ad">
+        <input type="hidden" name="package_id" id="f-package-id">
+        <input type="hidden" name="slot_id" id="f-slot-id">
 
-          <!-- Step 1: Package -->
-          <div style="margin-bottom:22px">
-            <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--brand-2)">STEP 1 — Choose a Package</h3>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px">
-              <?php foreach($packages as $p): ?>
-              <label style="cursor:pointer">
-                <input type="radio" name="package_id" value="<?= $p['id'] ?>" required
-                       onchange="updateEndDate()" style="display:none" class="pkg-radio">
-                <div class="pkg-card" data-days="<?= $p['duration_days'] ?>" data-price="<?= $p['price'] ?>"
-                     style="border:2px solid var(--border);border-radius:10px;padding:14px 12px;text-align:center;transition:.2s">
-                  <div style="font-size:15px;font-weight:800;color:var(--brand)">₹<?= number_format($p['price'],0) ?></div>
-                  <div style="font-size:12.5px;font-weight:600;margin:4px 0"><?= sanitize($p['name']) ?></div>
-                  <div style="font-size:11px;color:var(--text-muted)"><?= $p['duration_days'] ?> days</div>
-                  <?php if ($p['description']): ?>
-                  <div style="font-size:10.5px;color:var(--text-muted);margin-top:5px;line-height:1.4"><?= sanitize($p['description']) ?></div>
-                  <?php endif; ?>
-                </div>
-              </label>
-              <?php endforeach; ?>
+        <!-- Step 1: Package -->
+        <div class="step-section">
+          <div class="step-header"><div class="step-num">1</div><div class="step-title">Choose a Package</div></div>
+          <div class="pkg-select-grid">
+            <?php foreach($packages as $p): ?>
+            <div class="pkg-select-card" data-id="<?=$p['id']?>" data-days="<?=$p['duration_days']?>" data-price="<?=$p['price']?>" onclick="selectPackage(this)">
+              <div class="pkg-price">₹<?= number_format($p['price'],0) ?></div>
+              <div class="pkg-name"><?= sanitize($p['name']) ?></div>
+              <div class="pkg-days-tag"><?= $p['duration_days'] ?> days<?= $p['max_slots']>1?' · '.$p['max_slots'].' slots':'' ?></div>
+              <?php if($p['description']): ?><div style="font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.4"><?= sanitize($p['description']) ?></div><?php endif; ?>
             </div>
+            <?php endforeach; ?>
           </div>
+          <div id="pkg-err" style="display:none;font-size:12.5px;color:#dc2626;margin-top:6px">⚠️ Please select a package.</div>
+        </div>
 
-          <!-- Step 2: Slot + Date -->
-          <div style="margin-bottom:22px">
-            <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--brand-2)">STEP 2 — Choose a Time Slot &amp; Start Date</h3>
+        <!-- Step 2: Time Slot -->
+        <div class="step-section">
+          <div class="step-header"><div class="step-num">2</div><div class="step-title">Select a Time Slot</div></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+            <?php foreach($slots as $s):
+              $today=date('Y-m-d');
+              $usedNow=$pdo->prepare("SELECT COUNT(*) FROM banner_ads WHERE slot_id=? AND status IN('approved','running','pending') AND start_date<=? AND end_date>=?");
+              $usedNow->execute([$s['id'],$today,$today]); $usedNow=(int)$usedNow->fetchColumn();
+              $freeNow=$s['max_concurrent']-$usedNow; $isFull=$freeNow<=0;
+              $fillPct=min(100,$s['max_concurrent']>0?round($usedNow/$s['max_concurrent']*100):0);
+            ?>
+            <div class="slot-select-card <?= $isFull?'full':'' ?>" data-id="<?=$s['id']?>" data-max="<?=$s['max_concurrent']?>" onclick="<?= $isFull?'':'selectSlot(this)' ?>">
+              <div style="font-weight:700;font-size:13px;margin-bottom:2px"><?= sanitize($s['name']) ?></div>
+              <div class="slot-time-label"><?=substr($s['start_time'],0,5)?>–<?=substr($s['end_time'],0,5)?></div>
+              <div class="slot-fill-mini"><div class="slot-fill-mini-bar" style="width:<?=$fillPct?>%;<?=$isFull?'background:linear-gradient(90deg,#dc2626,#f87171)':''?>"></div></div>
+              <div style="font-size:11.5px;color:<?=$isFull?'#dc2626':'var(--success)'?>;font-weight:600"><?=$isFull?'FULL':'✓ '.$freeNow.' slot'.($freeNow>1?'s':'').' available'?></div>
+              <?php if($s['description']): ?><div style="font-size:10.5px;color:var(--text-muted);margin-top:4px"><?=sanitize($s['description'])?></div><?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <div id="slot-err" style="display:none;font-size:12.5px;color:#dc2626;margin-top:6px">⚠️ Please select a time slot.</div>
+          <div id="avail-notice" style="display:none;font-size:12.5px;margin-top:10px;padding:8px 12px;border-radius:8px"></div>
+        </div>
+
+        <!-- Step 3: Dates -->
+        <div class="step-section">
+          <div class="step-header"><div class="step-num">3</div><div class="step-title">Set Your Start Date</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div class="form-group">
-              <label class="form-label">Time Slot <span class="req">*</span></label>
-              <select name="slot_id" class="form-control" required id="slot-select" onchange="updateAvailability()">
-                <option value="">Select a slot…</option>
-                <?php foreach($slots as $s): ?>
-                <option value="<?= $s['id'] ?>" data-max="<?= $s['max_concurrent'] ?>">
-                  <?= sanitize($s['name']) ?> (<?= substr($s['start_time'],0,5) ?>–<?= substr($s['end_time'],0,5) ?>)
-                  <?php if ($s['description']): ?>– <?= sanitize($s['description']) ?><?php endif; ?>
-                </option>
-                <?php endforeach; ?>
-              </select>
-              <div id="slot-availability" style="font-size:12px;margin-top:5px;color:var(--text-muted)"></div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="form-group">
-                <label class="form-label">Start Date <span class="req">*</span></label>
-                <input type="date" name="start_date" id="start-date" class="form-control"
-                       min="<?= date('Y-m-d') ?>" required onchange="updateEndDate()">
-              </div>
-              <div class="form-group">
-                <label class="form-label">End Date (auto-calculated)</label>
-                <input type="text" id="end-date-display" class="form-control" readonly
-                       style="background:var(--n50);color:var(--text-muted)" placeholder="Select package + date">
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 3: Banner image upload -->
-          <div style="margin-bottom:22px">
-            <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--brand-2)">STEP 3 — Upload Banner Image</h3>
-            <div class="form-group">
-              <label class="form-label">Banner Image <span class="req">*</span></label>
-              <input type="file" name="image" class="form-control" accept="image/jpeg,image/png,image/webp"
-                     required onchange="previewBanner(this)">
-              <p style="font-size:11.5px;color:var(--text-muted);margin-top:6px">
-                📐 Required dimensions: <strong>1600 × 600 px</strong> (8:3 landscape ratio)<br>
-                Formats: JPG, PNG, WebP &nbsp;|&nbsp; Max size: 5 MB<br>
-                Keep important content within the centre 80% of the image width.
-              </p>
-            </div>
-            <!-- Live preview -->
-            <div id="banner-preview" style="display:none;margin-top:10px">
-              <div style="font-size:12px;font-weight:600;margin-bottom:6px">Preview (actual display ratio):</div>
-              <div style="width:100%;aspect-ratio:8/3;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--n50)">
-                <img id="banner-preview-img" src="" alt="" style="width:100%;height:100%;object-fit:cover">
-              </div>
-              <div id="banner-dim-warning" style="display:none;margin-top:6px;font-size:11.5px;color:#f59e0b">
-                ⚠️ Image dimensions don't match 1600×600. It will still display but may appear cropped.
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 4: Optional overlay content -->
-          <div style="margin-bottom:22px">
-            <h3 style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--brand-2)">STEP 4 — Optional Content Overlay</h3>
-            <p style="font-size:11.5px;color:var(--text-muted);margin-bottom:12px">Leave blank if your banner image already contains the message.</p>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="form-group"><label class="form-label">Overlay Title</label><input type="text" name="title" class="form-control" maxlength="150" placeholder="e.g. Premium Kraft Paper"></div>
-              <div class="form-group"><label class="form-label">CTA Button Text</label><input type="text" name="button_text" class="form-control" maxlength="60" placeholder="e.g. Shop Now"></div>
-            </div>
-            <div class="form-group"><label class="form-label">Subtitle</label><input type="text" name="subtitle" class="form-control" maxlength="255" placeholder="e.g. Flat 10% off on bulk orders"></div>
-            <div class="form-group"><label class="form-label">Click-through URL</label><input type="url" name="link_url" class="form-control" placeholder="https://…"></div>
-          </div>
-
-          <!-- Step 5: Payment -->
-          <div style="margin-bottom:22px;padding:16px;background:#fef9ec;border:1px solid #f5deab;border-radius:8px">
-            <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;color:var(--brand-2)">STEP 5 — Payment</h3>
-            <div id="amount-display" style="font-size:22px;font-weight:800;color:var(--brand);margin-bottom:10px">Select a package above</div>
-            <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">
-              Transfer the amount to our bank account or UPI and paste the transaction reference below.
-              Your ad will go live once payment is verified by our team.
-            </p>
-            <div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12.5px;margin-bottom:12px">
-              <strong>Payment Details:</strong><br>
-              Bank: PaperMart India Pvt Ltd &nbsp;|&nbsp; IFSC: HDFC0001234<br>
-              A/C No: 5010 0123 4567 &nbsp;|&nbsp; UPI: papermart@hdfcbank
+              <label class="form-label">Start Date <span class="req">*</span></label>
+              <input type="date" name="start_date" id="start-date" class="form-control" min="<?=date('Y-m-d')?>" required onchange="onDateChange()">
             </div>
             <div class="form-group">
-              <label class="form-label">Transaction / UTR Reference (optional now, required to activate)</label>
-              <input type="text" name="payment_ref" class="form-control" placeholder="e.g. UTR123456789">
+              <label class="form-label">End Date <span style="font-size:11px;color:var(--text-muted)">(auto-calculated)</span></label>
+              <div id="end-date-display" style="height:42px;display:flex;align-items:center;padding:0 14px;background:var(--cream-light);border:1.5px solid var(--border-light);border-radius:var(--radius-sm);font-size:13.5px;color:var(--text-muted);border-radius:8px">Select package + date</div>
             </div>
           </div>
+        </div>
 
-          <button type="submit" class="btn btn-primary btn-lg btn-full">Submit Ad Booking →</button>
-          <p style="font-size:11.5px;color:var(--text-muted);text-align:center;margin-top:8px">
-            Our team reviews all submissions within 24 hours. You'll see the status update in "My Ads".
-          </p>
-        </form>
-      </div>
+        <!-- Step 4: Banner Image -->
+        <div class="step-section">
+          <div class="step-header"><div class="step-num">4</div><div class="step-title">Upload Your Banner</div></div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Banner Image <span class="req">*</span></label>
+            <input type="file" name="image" class="form-control" accept="image/jpeg,image/png,image/webp" required onchange="previewBanner(this)">
+            <p style="font-size:11.5px;color:var(--text-muted);margin-top:6px;line-height:1.7">📐 <strong>Required: 1600 × 600 px</strong> (8:3 ratio) · JPG / PNG / WebP · Max 5 MB<br>Keep text, logos, and key content within the <strong>centre 80%</strong> of the image.</p>
+          </div>
+          <div class="banner-preview-box" id="banner-preview-wrap">
+            <div style="text-align:center;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:4px">🖼️</div><div style="font-size:12.5px">Your banner will appear here</div></div>
+          </div>
+          <div id="banner-dim-warn" style="display:none;font-size:12px;color:#d97706;margin-top:6px;padding:6px 10px;background:#fef3c7;border-radius:6px">⚠️ Dimensions don't match 1600×600. The image will still display but may appear cropped or stretched.</div>
+        </div>
+
+        <!-- Step 5: Optional Overlay -->
+        <div class="step-section">
+          <div class="step-header"><div class="step-num">5</div><div class="step-title">Optional Text Overlay <span style="font-size:12px;font-weight:400;color:var(--text-muted)">(leave blank if banner is self-contained)</span></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group"><label class="form-label">Title</label><input type="text" name="title" class="form-control" maxlength="150" placeholder="e.g. Premium Kraft Paper"></div>
+            <div class="form-group"><label class="form-label">CTA Button Text</label><input type="text" name="button_text" class="form-control" maxlength="60" placeholder="e.g. Shop Now"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Subtitle</label><input type="text" name="subtitle" class="form-control" maxlength="255" placeholder="e.g. Flat 10% off on bulk orders this month"></div>
+          <div class="form-group" style="margin-bottom:0"><label class="form-label">Click-through URL</label><input type="url" name="link_url" class="form-control" placeholder="https://…"></div>
+        </div>
+
+        <!-- Step 6: Payment -->
+        <div class="step-section">
+          <div class="step-header"><div class="step-num">6</div><div class="step-title">Complete Payment</div></div>
+          <div class="payment-box">
+            <div style="margin-bottom:4px;font-size:12px;font-weight:600;color:var(--crimson-deep);text-transform:uppercase;letter-spacing:.05em">Amount to Pay</div>
+            <div class="payment-amount" id="pay-amount">Select a package above</div>
+            <div class="bank-details">
+              <strong>Bank Transfer / UPI</strong><br>
+              Company: PaperMart India Pvt Ltd<br>
+              Bank: HDFC Bank &nbsp;|&nbsp; IFSC: HDFC0001234<br>
+              A/C: 5010 0123 4567 &nbsp;|&nbsp; UPI: papermart@hdfcbank
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" style="font-size:13px">Transaction / UTR Reference <span style="font-size:11px;color:var(--text-muted)">(optional now, required to activate)</span></label>
+              <input type="text" name="payment_ref" class="form-control" placeholder="e.g. UTR123456789012">
+            </div>
+          </div>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.6">Your ad will be reviewed within 24 hours. It goes live once payment is verified. You can add your payment reference later from "My Ads".</p>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg btn-full" onclick="return validateBooking()" style="font-size:15px;padding:14px">Submit Ad Booking →</button>
+      </form>
     </div>
 
-    <!-- Right: info sidebar -->
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div class="card">
-        <div class="card-body">
-          <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">📋 How It Works</h3>
-          <?php foreach([
-            ['1','Choose a package','Pick the duration and pricing that fits your campaign.'],
-            ['2','Select a slot','Each slot runs your banner during a specific time window every day.'],
-            ['3','Upload your banner','Recommended 1600×600px. Your actual product photo works great.'],
-            ['4','Pay & submit','Transfer payment and paste the reference. We verify within 24h.'],
-            ['5','Go live','Once approved, your banner rotates automatically in the homepage carousel.'],
-          ] as [$n,$title,$desc]): ?>
-          <div style="display:flex;gap:10px;margin-bottom:12px">
-            <div style="width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0"><?= $n ?></div>
-            <div><div style="font-weight:600;font-size:12.5px"><?= $title ?></div><div style="font-size:11.5px;color:var(--text-muted);margin-top:2px"><?= $desc ?></div></div>
-          </div>
+    <!-- Right sidebar -->
+    <div class="book-sidebar" style="width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:16px">
+
+      <div class="info-card">
+        <div class="info-card-header">📋 How It Works</div>
+        <div class="info-card-body">
+          <?php foreach([['1','Pick a package','Choose duration and price that fits your goal.'],['2','Choose a slot','Each slot runs during a specific time window daily.'],['3','Upload banner','Designed at 1600×600px for best results.'],['4','Pay & submit','Transfer and paste the UTR. We verify in 24h.'],['5','Go live 🚀','Your banner rotates automatically on the homepage.']] as [$n,$t,$d]): ?>
+          <div class="how-step"><div class="how-num"><?=$n?></div><div><div style="font-weight:600;font-size:12.5px"><?=$t?></div><div style="font-size:11.5px;color:var(--text-muted);margin-top:2px"><?=$d?></div></div></div>
           <?php endforeach; ?>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-body">
-          <h3 style="font-size:14px;font-weight:700;margin-bottom:12px">⏰ Available Slots Today</h3>
-          <?php foreach($slots as $s): ?>
-          <?php
-          $today   = date('Y-m-d');
-          $nextWeek= date('Y-m-d', strtotime('+7 days'));
-          $slotStmt= $pdo->prepare("SELECT COUNT(*) FROM banner_ads WHERE slot_id=? AND status IN('approved','running','pending') AND start_date<=? AND end_date>=?");
-          $slotStmt->execute([$s['id'],$today,$today]);
-          $used = (int)$slotStmt->fetchColumn();
-          $free = $s['max_concurrent'] - $used;
+      <div class="info-card">
+        <div class="info-card-header">⏰ Slot Availability Today</div>
+        <div class="info-card-body">
+          <?php foreach($slots as $s):
+            $today=date('Y-m-d');
+            $st=$pdo->prepare("SELECT COUNT(*) FROM banner_ads WHERE slot_id=? AND status IN('approved','running','pending') AND start_date<=? AND end_date>=?");
+            $st->execute([$s['id'],$today,$today]); $used=(int)$st->fetchColumn();
+            $free=$s['max_concurrent']-$used; $isFull=$free<=0;
           ?>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px">
-            <div>
-              <div style="font-size:13px;font-weight:600"><?= sanitize($s['name']) ?></div>
-              <div style="font-size:11px;color:var(--text-muted)"><?= substr($s['start_time'],0,5) ?>–<?= substr($s['end_time'],0,5) ?></div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:12px;font-weight:700;color:<?= $free>0?'#22c55e':'#ef4444' ?>"><?= $free ?> free</div>
-              <div style="font-size:10px;color:var(--text-muted)"><?= $used ?>/<?= $s['max_concurrent'] ?> used</div>
-            </div>
+          <div class="slot-avail-row">
+            <div><div style="font-size:13px;font-weight:600"><?=sanitize($s['name'])?></div><div style="font-size:11px;color:var(--text-muted)"><?=substr($s['start_time'],0,5)?>–<?=substr($s['end_time'],0,5)?></div></div>
+            <div style="text-align:right"><div style="font-size:12px;font-weight:700;color:<?=$isFull?'#dc2626':'#16a34a'?>"><?=$isFull?'FULL':$free.' free'?></div><div style="font-size:10px;color:var(--text-muted)"><?=$used?>/<?=$s['max_concurrent']?></div></div>
           </div>
           <?php endforeach; ?>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-body">
-          <h3 style="font-size:14px;font-weight:700;margin-bottom:10px">📐 Banner Requirements</h3>
-          <ul style="font-size:12px;color:var(--text-muted);line-height:2;padding-left:16px;margin:0">
-            <li>Dimensions: <strong>1600 × 600 px</strong></li>
-            <li>Format: JPG, PNG, or WebP</li>
-            <li>Max file size: 5 MB</li>
-            <li>Keep text &amp; logos in centre 80%</li>
-            <li>No obscene or competitor content</li>
-            <li>Plain background works best</li>
+      <div class="info-card">
+        <div class="info-card-header">📐 Banner Requirements</div>
+        <div class="info-card-body">
+          <ul style="font-size:12.5px;color:var(--text-muted);line-height:2.1;padding-left:18px;margin:0">
+            <li>Size: <strong>1600 × 600 px</strong></li>
+            <li>Format: JPG, PNG, WebP</li>
+            <li>Max file: 5 MB</li>
+            <li>Keep content in centre 80%</li>
+            <li>No competitor branding</li>
           </ul>
         </div>
       </div>
@@ -453,100 +400,105 @@ include __DIR__ . '/../includes/head.php';
   <?php endif; ?>
 </div>
 
-<!-- Payment reference update modal -->
-<div id="pay-modal" class="modal-backdrop">
+<!-- Payment Reference Modal -->
+<div id="payref-modal" class="modal-backdrop">
   <div class="modal" style="max-width:400px">
-    <div class="modal-header"><h3>Add Payment Reference</h3><button class="modal-close" onclick="document.getElementById('pay-modal').classList.remove('open')">✕</button></div>
+    <div class="modal-header"><h3>Submit Payment Reference</h3><button class="modal-close" onclick="document.getElementById('payref-modal').classList.remove('open')">✕</button></div>
     <form method="POST" class="modal-body">
-      <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+      <input type="hidden" name="csrf_token" value="<?=csrfToken()?>">
       <input type="hidden" name="action" value="update_pay_ref">
-      <input type="hidden" name="ad_id" id="paymod-adid">
-      <div id="paymod-info" style="font-size:13px;color:var(--text-muted);margin-bottom:12px"></div>
-      <div class="form-group">
-        <label class="form-label">Transaction / UTR Reference</label>
-        <input type="text" name="payment_ref" id="paymod-ref" class="form-control" placeholder="e.g. UTR123456789" required>
-      </div>
-      <p style="font-size:11.5px;color:var(--text-muted)">Our team will verify the payment and activate your ad within 24 hours.</p>
+      <input type="hidden" name="ad_id" id="pr-adid">
+      <div id="pr-info" style="font-size:13px;color:var(--text-muted);background:var(--cream-light);border-radius:8px;padding:10px 12px;margin-bottom:14px"></div>
+      <div class="form-group"><label class="form-label">Transaction / UTR Reference <span class="req">*</span></label><input type="text" name="payment_ref" id="pr-ref" class="form-control" placeholder="e.g. UTR123456789012" required></div>
+      <p style="font-size:11.5px;color:var(--text-muted);margin-bottom:14px">Once submitted, our team will verify and activate your ad within 24 hours.</p>
       <button type="submit" class="btn btn-primary btn-full">Submit Reference</button>
     </form>
   </div>
 </div>
 
 <script>
-// Package card selection highlight
-document.querySelectorAll('.pkg-radio').forEach(r=>{
-  r.addEventListener('change',function(){
-    document.querySelectorAll('.pkg-card').forEach(c=>c.style.borderColor='var(--border)');
-    this.closest('label').querySelector('.pkg-card').style.borderColor='var(--brand)';
-    updateEndDate();
-  });
-});
+let selectedPkgId=null, selectedSlotId=null;
 
-// Auto-calculate end date from start date + selected package duration
-function updateEndDate(){
-  const radio   = document.querySelector('.pkg-radio:checked');
-  const startEl = document.getElementById('start-date');
-  const endEl   = document.getElementById('end-date-display');
-  const amtEl   = document.getElementById('amount-display');
-  if (!radio || !startEl.value){ endEl.value=''; return; }
-  const days  = parseInt(radio.closest('label').querySelector('.pkg-card').dataset.days);
-  const price = parseFloat(radio.closest('label').querySelector('.pkg-card').dataset.price);
-  const start = new Date(startEl.value);
-  start.setDate(start.getDate() + days - 1);
-  endEl.value = start.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  amtEl.textContent = '₹' + price.toLocaleString('en-IN',{minimumFractionDigits:2});
-  updateAvailability();
+function selectPackage(el){
+  document.querySelectorAll('.pkg-select-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedPkgId=el.dataset.id;
+  document.getElementById('f-package-id').value=selectedPkgId;
+  document.getElementById('pkg-err').style.display='none';
+  const price=parseFloat(el.dataset.price);
+  document.getElementById('pay-amount').textContent='₹'+price.toLocaleString('en-IN',{minimumFractionDigits:0});
+  onDateChange();
 }
 
-// Check slot availability for selected dates
-function updateAvailability(){
-  const slotEl  = document.getElementById('slot-select');
-  const startEl = document.getElementById('start-date');
-  const infoEl  = document.getElementById('slot-availability');
-  const opt     = slotEl.options[slotEl.selectedIndex];
-  if (!opt || !opt.value || !startEl.value){ infoEl.textContent=''; return; }
-  const radio = document.querySelector('.pkg-radio:checked');
-  if (!radio){ infoEl.textContent='Select a package to check availability.'; return; }
-  const days    = parseInt(radio.closest('label').querySelector('.pkg-card').dataset.days);
-  const maxConc = parseInt(opt.dataset.max||3);
-  // AJAX check
-  fetch('<?= BASE_URL ?>/public/ajax/check-ad-slot.php?slot_id='+opt.value+'&start='+startEl.value+'&days='+days)
-    .then(r=>r.json())
-    .then(d=>{
-      const free = maxConc - (d.used||0);
-      infoEl.style.color = free>0?'#22c55e':'#ef4444';
-      infoEl.textContent = free>0
-        ? '✅ '+free+' slot(s) available for these dates.'
-        : '❌ This slot is fully booked for your chosen dates. Please pick different dates or a different slot.';
-    })
-    .catch(()=>{ infoEl.textContent=''; });
+function selectSlot(el){
+  document.querySelectorAll('.slot-select-card:not(.full)').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedSlotId=el.dataset.id;
+  document.getElementById('f-slot-id').value=selectedSlotId;
+  document.getElementById('slot-err').style.display='none';
+  checkLiveAvailability();
 }
 
-// Live banner preview + dimension check
+function onDateChange(){
+  const startEl=document.getElementById('start-date');
+  const dispEl=document.getElementById('end-date-display');
+  const pkgEl=document.querySelector('.pkg-select-card.selected');
+  if(!startEl.value||!pkgEl){dispEl.textContent='Select package + date';return;}
+  const days=parseInt(pkgEl.dataset.days);
+  const start=new Date(startEl.value);
+  start.setDate(start.getDate()+days-1);
+  dispEl.textContent=start.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  dispEl.style.color='var(--text)';
+  checkLiveAvailability();
+}
+
+function checkLiveAvailability(){
+  const n=document.getElementById('avail-notice');
+  const startEl=document.getElementById('start-date');
+  const pkgEl=document.querySelector('.pkg-select-card.selected');
+  if(!selectedSlotId||!startEl.value||!pkgEl){n.style.display='none';return;}
+  fetch('<?=BASE_URL?>/public/ajax/check-ad-slot.php?slot_id='+selectedSlotId+'&start='+startEl.value+'&days='+pkgEl.dataset.days)
+    .then(r=>r.json()).then(d=>{
+      const maxEl=document.querySelector('.slot-select-card.selected');
+      const max=maxEl?parseInt(maxEl.dataset.max):3;
+      const free=max-(d.used||0);
+      n.style.display='block';
+      if(free>0){n.style.background='#dcfce7';n.style.color='#16a34a';n.textContent='✅ '+free+' slot'+(free>1?'s':'')+' available for your selected dates.';}
+      else{n.style.background='#fee2e2';n.style.color='#dc2626';n.textContent='❌ This slot is fully booked for your dates. Please try different dates or another slot.';}
+    }).catch(()=>{n.style.display='none';});
+}
+
 function previewBanner(input){
-  const wrap  = document.getElementById('banner-preview');
-  const img   = document.getElementById('banner-preview-img');
-  const warn  = document.getElementById('banner-dim-warning');
-  if (!input.files[0]){ wrap.style.display='none'; return; }
-  const url = URL.createObjectURL(input.files[0]);
-  img.onload = function(){
-    // Check if dimensions are close to 1600×600 (allow ±10%)
-    const rOk = Math.abs(this.naturalWidth/this.naturalHeight - 8/3) < 0.3;
-    warn.style.display = rOk ? 'none' : 'block';
+  const wrap=document.getElementById('banner-preview-wrap');
+  const warn=document.getElementById('banner-dim-warn');
+  if(!input.files[0]){wrap.innerHTML='<div style="text-align:center;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:4px">🖼️</div><div style="font-size:12.5px">Your banner will appear here</div></div>';wrap.classList.remove('has-img');return;}
+  const url=URL.createObjectURL(input.files[0]);
+  const img=document.createElement('img');
+  img.onload=function(){
+    const ratio=this.naturalWidth/this.naturalHeight;
+    warn.style.display=Math.abs(ratio-8/3)<0.35?'none':'block';
     URL.revokeObjectURL(url);
   };
-  img.src = url;
-  wrap.style.display = 'block';
+  img.src=url; img.style.cssText='width:100%;height:100%;object-fit:cover';
+  wrap.innerHTML=''; wrap.appendChild(img); wrap.classList.add('has-img');
 }
 
-function openPayModal(adId, payId, price, pkgName){
-  document.getElementById('paymod-adid').value = adId;
-  document.getElementById('paymod-info').textContent = pkgName + ' — ₹' + parseFloat(price).toFixed(2);
-  document.getElementById('pay-modal').classList.add('open');
+function validateBooking(){
+  let ok=true;
+  if(!selectedPkgId){document.getElementById('pkg-err').style.display='block';ok=false;document.querySelector('.step-section').scrollIntoView({behavior:'smooth'});}
+  if(!selectedSlotId){document.getElementById('slot-err').style.display='block';if(ok)document.getElementById('slot-err').scrollIntoView({behavior:'smooth'});ok=false;}
+  return ok;
 }
-document.getElementById('pay-modal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+
+function openPayRefModal(adId,payId,price,pkgName){
+  document.getElementById('pr-adid').value=adId;
+  document.getElementById('pr-ref').value='';
+  document.getElementById('pr-info').innerHTML='<strong>'+pkgName+'</strong> &middot; ₹'+parseFloat(price).toFixed(0);
+  document.getElementById('payref-modal').classList.add('open');
+}
+document.getElementById('payref-modal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 </script>
 
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
-<script src="<?= BASE_URL ?>/assets/script.js"></script>
+<script src="<?=BASE_URL?>/assets/script.js"></script>
 </div></div></body></html>

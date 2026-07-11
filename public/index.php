@@ -13,17 +13,19 @@ $totalVends  = $pdo->query("SELECT COUNT(*) FROM users WHERE role='vendor' AND s
 $totalEnqs   = $pdo->query("SELECT COUNT(*) FROM web_enquiries")->fetchColumn();
 $categories  = $pdo->query("SELECT c.*,i.name AS iname,(SELECT COUNT(*) FROM products WHERE category_id=c.id AND status='active') AS prod_count FROM categories c JOIN industries i ON i.id=c.industry_id WHERE c.status=1 ORDER BY prod_count DESC LIMIT 12")->fetchAll();
 
-// Hero carousel — pulls running banner_ads whose time slot window is currently active.
-// Falls back to empty array (shows plain gradient hero) if:
-//   a) migration_ads.sql hasn't been run yet (table doesn't exist), OR
-//   b) no ads are currently running in an active slot window
+// Hero carousel — priority order:
+// 1. Vendor banner_ads that are currently running in an active time slot
+// 2. Admin-managed fallback banners (when no vendor ads are running)
+// 3. Empty array → plain gradient hero fallback
 try {
     $heroBanners = $pdo->query(
-        "SELECT ba.*, u.company AS vendor_company,
+        "SELECT ba.id, ba.image, ba.title, ba.subtitle, ba.link_url, ba.button_text,
+                ba.sort_order, ba.impressions, ba.clicks,
+                u.company AS vendor_company,
                 s.name AS slot_name, s.start_time, s.end_time
          FROM banner_ads ba
-         JOIN users u      ON u.id  = ba.vendor_id
-         JOIN ad_slots s   ON s.id  = ba.slot_id
+         JOIN users u    ON u.id = ba.vendor_id
+         JOIN ad_slots s ON s.id = ba.slot_id
          WHERE ba.status   = 'running'
            AND s.is_active = 1
            AND ba.start_date <= CURDATE()
@@ -32,13 +34,27 @@ try {
          ORDER BY ba.sort_order ASC, ba.id ASC
          LIMIT 10"
     )->fetchAll();
-    // Increment impression counter for all currently displayed ads
+    // Increment impression counter for every ad shown this page load
     if ($heroBanners) {
         $ids = implode(',', array_map(fn($b) => (int)$b['id'], $heroBanners));
         $pdo->query("UPDATE banner_ads SET impressions = impressions + 1 WHERE id IN($ids)");
     }
 } catch (Exception $e) {
-    $heroBanners = []; // migration_ads.sql not yet run — graceful fallback
+    $heroBanners = [];
+}
+// If no vendor ads are active right now, fall back to admin-managed banners
+if (empty($heroBanners)) {
+    try {
+        $heroBanners = $pdo->query(
+            "SELECT id, image, title, subtitle, link_url, button_text, sort_order,
+                    NULL AS vendor_company, NULL AS slot_name
+             FROM banners
+             WHERE status = 'active'
+             ORDER BY sort_order ASC, id ASC"
+        )->fetchAll();
+    } catch (Exception $e) {
+        $heroBanners = []; // banners table doesn't exist yet — plain hero shown
+    }
 }
 
 $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'🗂️','Mono Carton'=>'🎁','Woven Fabric'=>'🧵','Non-Woven Fabric'=>'🎀','Industrial Adhesives'=>'🧴','Surface Coatings'=>'🖌️'];
@@ -498,13 +514,12 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 /* Small phone (≤480px): narrowest cards so 2+ are always visible */
 @media(max-width:480px){
   .cat-card { width: 155px; min-height: 182px; }
-  .compare-group{
-    display:grid;
-    grid-template-columns: 1fr !important;
-  }
 }
 
-
+.compare-group{
+  display:grid;
+  grid-template-columns: 1fr !important;
+}
 </style>
 
 <script>
