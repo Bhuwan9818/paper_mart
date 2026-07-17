@@ -4,10 +4,10 @@
 // Place in: /dashv10_Fixed/ajax/chatbot.php
 // ============================================================
 define('IN_APP', true);
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../includes/functions.php';
-require_once __DIR__ . '/../chatbot/engine.php';
-require_once __DIR__ . '/../chatbot/flow.php';
+// require_once __DIR__ . '/../config.php';
+// require_once __DIR__ . '/../includes/functions.php';
+// require_once __DIR__ . '/../chatbot/engine.php';
+// require_once __DIR__ . '/../chatbot/flow.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');

@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <input type="password" name="confirm" class="form-control" required>
                 </div>
             </div>
-
+            
             <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px">
                 Create Account
             </button>

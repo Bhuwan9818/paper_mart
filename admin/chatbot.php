@@ -159,14 +159,25 @@ table.t{width:100%;border-collapse:collapse;font-size:13px}
 </style>
 
 <div class="" style="padding:0">
-<div style="padding:20px 24px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
-    <div>
+<div >
+  <!-- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+      
+    </div>
+  </div> -->
+<div class="topbar">
+    <div class="topbar-left">
+        <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+        <div>
       <h1 style="margin:0;font-size:22px;font-weight:800">💬 Chatbot Manager</h1>
       <p style="margin:4px 0 0;color:#888;font-size:13px">Manage intents, keywords, responses, tickets — no AI API needed.</p>
     </div>
-  </div>
+    </div>
+</div>
 
+
+  <div style="padding:20px 24px">
   <?php if(isset($_GET['done'])&&$msg||true): ?>
   <?php if($msg): ?><div style="background:#d1fae5;color:#065f46;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px"><?= sH($msg) ?></div><?php endif; ?>
   <?php endif; ?>
@@ -470,10 +481,11 @@ table.t{width:100%;border-collapse:collapse;font-size:13px}
 
 </div><!-- /padding -->
 </div><!-- /main -->
+</div>
 
 <!-- Ticket modals -->
 <?php if($tab==='tickets' && !empty($tickets)): foreach($tickets as $tk): ?>
-<dialog id="tkm<?= $tk['id'] ?>">
+<dialog id="tkm<?= $tk['id'] ?>" class="modal" style="border:none;border-radius:10px;padding:20px;width:400px;max-width:90vw; justify-self:center; align-self:center;">
   <h3 style="margin:0 0 14px;color:#8b241d;font-size:16px">Update: <?= sH($tk['ticket_ref']) ?></h3>
   <form method="POST">
     <input type="hidden" name="action" value="update_ticket">
