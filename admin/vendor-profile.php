@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/subscription.php';
+require_once __DIR__ . '/../includes/team.php';
 requireRoleStrict('admin');
 
 $vid = (int)($_GET['id'] ?? 0);
@@ -26,6 +28,13 @@ $stats = $stats->fetch();
 /* ── Recent products ───────────────────────────────────── */
 $recentProds = $pdo->prepare("SELECT p.*,c.name AS cname FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.vendor_id=? ORDER BY p.created_at DESC LIMIT 6");
 $recentProds->execute([$vid]); $recentProds = $recentProds->fetchAll();
+
+/* ── Team members ──────────────────────────────────────── */
+$teamMembers = $pdo->prepare("SELECT * FROM vendor_team_members WHERE vendor_id=? ORDER BY created_at DESC");
+$teamMembers->execute([$vid]); $teamMembers = $teamMembers->fetchAll();
+$teamCount = count($teamMembers);
+$teamLimit = getVendorTeamLimit($pdo, $vid);
+$teamCatalog = teamPermissionCatalog();
 
 /* ── POST handler ──────────────────────────────────────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -264,6 +273,7 @@ include __DIR__ . '/../includes/head.php';
     <button class="tab-btn" onclick="switchTab('media')">🖼️ Logo &amp; Banner</button>
     <button class="tab-btn" onclick="switchTab('account')">👤 Account</button>
     <button class="tab-btn" onclick="switchTab('products')">📦 Products</button>
+    <button class="tab-btn" onclick="switchTab('team')">👥 Team (<?= $teamCount ?>/<?= $teamLimit ?>)</button>
   </div>
 
   <!-- TAB 1: Business Info -->
@@ -511,6 +521,53 @@ include __DIR__ . '/../includes/head.php';
           <div class="empty-state"><div class="es-icon">📭</div><p>No products yet.</p></div>
         <?php endif; ?>
       </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: Team -->
+  <div class="tab-panel" id="tab-team">
+    <div class="card">
+      <div class="card-header">
+        <h2>👥 Team Members</h2>
+        <span style="margin-left:auto;font-size:13px;color:var(--text-muted)"><?= $teamCount ?> of <?= $teamLimit ?> seats used (<?= sanitize(ucfirst($sub['plan_name'] ?? 'Free')) ?> plan)</span>
+      </div>
+      <?php if (!$teamMembers): ?>
+        <div class="empty-state" style="padding:32px"><div class="es-icon">👥</div><p>This vendor hasn't added any team members yet.</p></div>
+      <?php else: ?>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Name</th><th>Username</th><th>Designation</th><th>Access Granted</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+            <tbody>
+            <?php foreach ($teamMembers as $m):
+                $perms = json_decode($m['permissions'] ?? '[]', true) ?: []; ?>
+            <tr>
+                <td><?= sanitize($m['name']) ?><?php if($m['email']): ?><div style="font-size:12px;color:var(--text-muted)"><?= sanitize($m['email']) ?></div><?php endif; ?></td>
+                <td><code><?= sanitize($m['username']) ?></code></td>
+                <td><?= sanitize($m['designation'] ?: '—') ?></td>
+                <td style="max-width:220px">
+                  <?php if (!$perms): ?><span style="color:var(--text-muted);font-size:12px">None</span><?php endif; ?>
+                  <?php foreach ($perms as $p): if (!isset($teamCatalog[$p])) continue; ?>
+                    <span style="display:inline-block;margin:2px 3px 2px 0;padding:2px 8px;border-radius:12px;background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:600"><?= $teamCatalog[$p]['icon'] ?> <?= $teamCatalog[$p]['label'] ?></span>
+                  <?php endforeach; ?>
+                </td>
+                <td><?= statusBadge($m['status']) ?></td>
+                <td class="text-muted"><?= $m['last_login'] ? timeAgo($m['last_login']) : 'Never' ?></td>
+                <td>
+                  <div class="td-actions">
+                    <?php if ($m['status']==='active'): ?>
+                      <a href="<?= BASE_URL ?>/admin/vendor-teams.php?action=deactivate&id=<?= $m['id'] ?>&return=profile" class="btn btn-warning btn-xs" onclick="return confirm('Suspend this team member?')">⏸</a>
+                    <?php else: ?>
+                      <a href="<?= BASE_URL ?>/admin/vendor-teams.php?action=activate&id=<?= $m['id'] ?>&return=profile" class="btn btn-success btn-xs" onclick="return confirm('Reactivate this team member?')">▶</a>
+                    <?php endif; ?>
+                    <a href="<?= BASE_URL ?>/admin/vendor-teams.php?action=delete&id=<?= $m['id'] ?>&return=profile" class="btn btn-danger btn-xs" onclick="return confirm('Permanently remove this team member?')">🗑</a>
+                  </div>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 
