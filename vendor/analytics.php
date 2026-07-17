@@ -4,6 +4,8 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/subscription.php';
 requireRoleStrict('vendor');
+require_once __DIR__ . '/../includes/team.php';
+requirePermission('analytics');
 $user = currentUser(); $uid = $user['id'];
 $sub  = getVendorSubscription($pdo, $uid);
 

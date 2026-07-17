@@ -3,6 +3,8 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
 requireRoleStrict('vendor');
+require_once __DIR__ . '/../includes/team.php';
+requirePermission('enquiries');
 require_once __DIR__ . '/../includes/subscription.php';
 $user = currentUser();
 $uid  = $user['id'];
