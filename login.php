@@ -31,6 +31,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 loginUser($user);
                 header('Location: ' . BASE_URL . '/index.php'); exit;
             }
+        } elseif ($role === 'vendor') {
+            // Not a primary vendor account — check if it's a team member login
+            require_once __DIR__ . '/includes/team.php';
+            $tm = $pdo->prepare("SELECT * FROM vendor_team_members WHERE username = ? LIMIT 1");
+            $tm->execute([$email]);
+            $member = $tm->fetch();
+
+            if ($member && password_verify($password, $member['password'])) {
+                if ($member['status'] === 'inactive') {
+                    $error = 'This team member account has been deactivated. Contact your account owner.';
+                } else {
+                    $vendorStmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role='vendor' LIMIT 1");
+                    $vendorStmt->execute([$member['vendor_id']]);
+                    $vendorUser = $vendorStmt->fetch();
+                    require_once __DIR__ . '/includes/subscription.php';
+                    $vSub = $vendorUser ? getVendorSubscription($pdo, $vendorUser['id']) : null;
+
+                    if (!$vendorUser || $vendorUser['status'] === 'inactive') {
+                        $error = 'This vendor account is currently unavailable.';
+                    } elseif (!$vSub || (int)($vSub['team_member_limit'] ?? 0) <= 0) {
+                        $error = 'Team access is not active on this account\'s current plan. Contact your account owner.';
+                    } else {
+                        loginTeamMember($member, $vendorUser);
+                        $pdo->prepare("UPDATE vendor_team_members SET last_login = NOW() WHERE id = ?")->execute([$member['id']]);
+                        logTeamActivity($pdo, $vendorUser['id'], $member['id'], 'Logged in');
+                        header('Location: ' . BASE_URL . '/index.php'); exit;
+                    }
+                }
+            } else {
+                $error = 'Invalid email, password, or role selection.';
+            }
         } else {
             $error = 'Invalid email, password, or role selection.';
         }
@@ -75,9 +106,10 @@ $flash = getFlash();
             <input type="hidden" name="role" id="role-input" value="customer">
 
             <div class="form-group">
-                <label class="form-label">Email Address</label>
-                <input type="email" name="email" class="form-control" placeholder="you@example.com"
+                <label class="form-label">Email / Username</label>
+                <input type="text" name="email" class="form-control" placeholder="you@example.com"
                        value="<?= sanitize($_POST['email'] ?? '') ?>" required autofocus>
+                <div style="font-size:11.5px;color:var(--text-muted);margin-top:4px">Team members: use the username your account owner gave you.</div>
             </div>
             <div class="form-group">
                 <label class="form-label">Password</label>

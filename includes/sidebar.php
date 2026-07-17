@@ -1,7 +1,11 @@
 <?php
+if (!function_exists('isTeamMemberSession')) {
+    require_once __DIR__ . '/team.php';
+}
 $user = currentUser();
 $role = $user['role'];
 $activePage = $activePage ?? '';
+$isTeamMember = isTeamMemberSession();
 
 $subInfo = null;
 $unreadNotifs = 0;
@@ -19,29 +23,31 @@ if ($role === 'vendor') {
 $vendorNav = [
     ['section' => 'Main'],
     ['icon'=>'⊞',  'label'=>'Dashboard',       'href'=>BASE_URL.'/vendor/dashboard.php',       'page'=>'dashboard'],
-    ['icon'=>'🔔', 'label'=>'Notifications',    'href'=>BASE_URL.'/vendor/notifications.php',   'page'=>'notifications', 'badge'=>$unreadNotifs],
+    ['icon'=>'🔔', 'label'=>'Notifications',    'href'=>BASE_URL.'/vendor/notifications.php',   'page'=>'notifications', 'badge'=>$unreadNotifs, 'perm'=>'notifications'],
     ['section'=>'Products'],
-    ['icon'=>'➕', 'label'=>'Add Product',       'href'=>BASE_URL.'/vendor/add-product.php',    'page'=>'add-product'],
-    ['icon'=>'📦', 'label'=>'My Products',       'href'=>BASE_URL.'/vendor/manage-products.php','page'=>'manage-products'],
+    ['icon'=>'➕', 'label'=>'Add Product',       'href'=>BASE_URL.'/vendor/add-product.php',    'page'=>'add-product', 'perm'=>'add-product'],
+    ['icon'=>'📦', 'label'=>'My Products',       'href'=>BASE_URL.'/vendor/manage-products.php','page'=>'manage-products', 'perm'=>'manage-products'],
     ['section'=>'Sales'],
-    ['icon'=>'📩', 'label'=>'Enquiries',         'href'=>BASE_URL.'/vendor/enquiries.php',      'page'=>'enquiries'],
+    ['icon'=>'📩', 'label'=>'Enquiries',         'href'=>BASE_URL.'/vendor/enquiries.php',      'page'=>'enquiries', 'perm'=>'enquiries'],
     ['section'=>'Catalogue'],
-    ['icon'=>'🗂️', 'label'=>'Request Category',  'href'=>BASE_URL.'/vendor/catalogue-request.php','page'=>'catalogue-request'],
+    ['icon'=>'🗂️', 'label'=>'Request Category',  'href'=>BASE_URL.'/vendor/catalogue-request.php','page'=>'catalogue-request', 'perm'=>'catalogue-request'],
     ['section'=>'Insights'],
-    ['icon'=>'📊', 'label'=>'Analytics',         'href'=>BASE_URL.'/vendor/analytics.php',      'page'=>'analytics'],
-    ['icon'=>'🚀', 'label'=>'Performance',        'href'=>BASE_URL.'/vendor/performance.php',   'page'=>'performance'],
+    ['icon'=>'📊', 'label'=>'Analytics',         'href'=>BASE_URL.'/vendor/analytics.php',      'page'=>'analytics', 'perm'=>'analytics'],
+    ['icon'=>'🚀', 'label'=>'Performance',        'href'=>BASE_URL.'/vendor/performance.php',   'page'=>'performance', 'perm'=>'performance'],
     ['section'=>'Account'],
-    ['icon'=>'💳', 'label'=>'Subscription',      'href'=>BASE_URL.'/vendor/subscription.php',  'page'=>'subscription'],
-    ['icon'=>'🎯', 'label'=>'Banner Ads',         'href'=>BASE_URL.'/vendor/ads.php',           'page'=>'ads'],
+    ['icon'=>'💳', 'label'=>'Subscription',      'href'=>BASE_URL.'/vendor/subscription.php',  'page'=>'subscription', 'ownerOnly'=>true],
+    ['icon'=>'🎯', 'label'=>'Banner Ads',         'href'=>BASE_URL.'/vendor/ads.php',           'page'=>'ads', 'perm'=>'ads'],
     // ['icon'=>'👤', 'label'=>'My Profile',         'href'=>BASE_URL.'/vendor/profile.php',       'page'=>'profile'],
-    ['icon'=>'🏢', 'label'=>'Business Profile',    'href'=>BASE_URL.'/vendor/business-profile.php','page'=>'business-profile'],
+    ['icon'=>'🏢', 'label'=>'Business Profile',    'href'=>BASE_URL.'/vendor/business-profile.php','page'=>'business-profile', 'perm'=>'business-profile'],
+    ['icon'=>'👥', 'label'=>'Team Members',       'href'=>BASE_URL.'/vendor/team.php',           'page'=>'team', 'perm'=>'team'],
 ];
 
 $adminNav = [
     ['icon'=>'⊞', 'label'=>'Dashboard',      'href'=>BASE_URL.'/admin/dashboard.php',      'page'=>'dashboard'],
     ['section'=>'Users'],
     ['icon'=>'🏪','label'=>'Vendors',         'href'=>BASE_URL.'/admin/vendors.php',        'page'=>'vendors'],
-    ['icon'=>'👥','label'=>'Customers',       'href'=>BASE_URL.'/admin/customers.php',      'page'=>'customers'],
+    ['icon'=>'👥','label'=>'Vendor Teams',    'href'=>BASE_URL.'/admin/vendor-teams.php',   'page'=>'vendor-teams'],
+    ['icon'=>'👤','label'=>'Customers',       'href'=>BASE_URL.'/admin/customers.php',      'page'=>'customers'],
     ['section'=>'Catalogue'],
     ['icon'=>'🏭','label'=>'Industries',      'href'=>BASE_URL.'/admin/industries.php',     'page'=>'industries'],
     ['icon'=>'🗂️','label'=>'Categories',      'href'=>BASE_URL.'/admin/categories.php',    'page'=>'categories'],
@@ -73,6 +79,29 @@ $nav = match($role) {
     'admin'=>$adminNav, 'vendor'=>$vendorNav, 'customer'=>$customerNav, default=>[]
 };
 
+if ($role === 'vendor' && $isTeamMember) {
+    $nav = array_values(array_filter($nav, function($item) {
+        if (isset($item['section'])) return true; // section labels re-filtered below
+        if (!empty($item['ownerOnly'])) return false; // billing never visible to team members
+        if (!empty($item['perm'])) return teamMemberHasPermission($item['perm']);
+        return true;
+    }));
+    // Drop section headers that ended up with no items under them
+    $clean = [];
+    foreach ($nav as $i => $item) {
+        if (isset($item['section'])) {
+            $hasNext = false;
+            for ($j = $i+1; $j < count($nav); $j++) {
+                if (isset($nav[$j]['section'])) break;
+                $hasNext = true; break;
+            }
+            if (!$hasNext) continue;
+        }
+        $clean[] = $item;
+    }
+    $nav = $clean;
+}
+
 $planName   = $subInfo ? ucfirst($subInfo['plan_name']) : 'Free';
 $planStatus = $subInfo ? $subInfo['status'] : 'trial';
 ?>
@@ -86,13 +115,16 @@ $planStatus = $subInfo ? $subInfo['status'] : 'trial';
   </div>
 
   <div class="sidebar-user">
-    <div class="su-avatar"><?= avatarLetter($user['name']) ?></div>
+    <div class="su-avatar"><?= avatarLetter($isTeamMember ? $_SESSION['team_member_name'] : $user['name']) ?></div>
     <div style="min-width:0;flex:1">
-      <div class="su-name"><?= sanitize($user['name']) ?></div>
+      <div class="su-name"><?= sanitize($isTeamMember ? $_SESSION['team_member_name'] : $user['name']) ?></div>
       <div class="su-plan">
         <span class="su-plan-badge"><?= sanitize($planName) ?></span>
         <?php if ($planStatus === 'trial'): ?><span style="font-size:9.5px;color:#f59e0b;margin-left:2px">TRIAL</span><?php endif; ?>
       </div>
+      <?php if ($isTeamMember): ?>
+        <div style="font-size:10.5px;color:var(--sidebar-muted);margin-top:2px">Team access · <?= sanitize($user['name']) ?>'s account</div>
+      <?php endif; ?>
     </div>
   </div>
 

@@ -50,6 +50,23 @@ function loginUser($user) {
     $_SESSION['name']    = $user['name'];
     $_SESSION['email']   = $user['email'];
     $_SESSION['role']    = $user['role'] ?? '';
+    $_SESSION['is_team_member'] = false;
+}
+
+// Logs a team member in "as" the vendor account they belong to, so every
+// existing vendor-scoped query (WHERE vendor_id = $_SESSION['user_id']) keeps
+// working unchanged. The real identity + permissions are tracked separately.
+function loginTeamMember($member, $vendorUser) {
+    $_SESSION['user_id'] = $vendorUser['id'];   // vendor account being operated on
+    $_SESSION['name']    = $vendorUser['name'];
+    $_SESSION['email']   = $vendorUser['email'];
+    $_SESSION['role']    = 'vendor';
+
+    $_SESSION['is_team_member']     = true;
+    $_SESSION['team_member_id']     = $member['id'];
+    $_SESSION['team_member_name']   = $member['name'];
+    $_SESSION['team_member_email']  = $member['email'];
+    $_SESSION['team_permissions']   = json_decode($member['permissions'] ?? '[]', true) ?: [];
 }
 
 function logoutUser() {
