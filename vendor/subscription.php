@@ -124,6 +124,11 @@ include __DIR__ . '/../includes/head.php';
         <?php endif; ?>
       </div>
       <ul class="plan-features">
+        <?php if ((int)$plan['team_member_limit'] > 0): ?>
+          <li><span class="check">✓</span><?= (int)$plan['team_member_limit'] ?> team member <?= (int)$plan['team_member_limit']===1?'seat':'seats' ?></li>
+        <?php else: ?>
+          <li style="opacity:.55"><span class="check" style="color:var(--text-muted)">✕</span>No team member access</li>
+        <?php endif; ?>
         <?php foreach ($features as $f): ?>
           <li><span class="check">✓</span><?= sanitize($f) ?></li>
         <?php endforeach; ?>

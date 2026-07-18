@@ -21,7 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ptMapping = $d['pt_mapping'] ?? [];
 
     if (!$vendorId)            $error = 'Please select a vendor.';
-    elseif (!$name)            $error = 'Please enter a product name.';
     elseif (empty($selPtIds))  $error = 'Please select at least one Product Type.';
     elseif (empty($ptMapping)) $error = 'Complete the mapping for at least one product type.';
     else {
@@ -65,11 +64,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($pm['price_min']) || !empty($pm['price_max']))
                 $priceRange = '₹'.($pm['price_min']??'').' – ₹'.($pm['price_max']??'');
 
+            $rowName = $name !== '' ? $name : ($meta['name'] ?? 'Untitled Product');
+
             $pdo->prepare("INSERT INTO products
                 (vendor_id,industry_id,category_id,product_type_id,name,short_desc,description,
                  price_range,min_order_qty,images,status)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute([$vendorId,$indId,$catId,$ptId,$name,$shortDesc,$desc,
+                ->execute([$vendorId,$indId,$catId,$ptId,$rowName,$shortDesc,$desc,
                            $priceRange,$moq,implode(',',$imgs),$initStatus]);
             $pid2 = $pdo->lastInsertId();
 
@@ -356,9 +357,9 @@ include __DIR__ . '/../includes/head.php';
             <div>Each card = one Product Type = one product listing. Check attributes, fill values, add prices, upload TDS and images (min 1, max 10).</div>
           </div>
           <div class="form-group" style="margin-top:12px">
-            <label class="form-label">Shared Product Name <span class="req">*</span></label>
+            <label class="form-label">Shared Product Name <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
             <input type="text" id="f_name" class="form-control" style="font-size:15px;padding:11px 14px" placeholder="e.g. Brown Kraft Paper · Carry Bag Grade">
-            <div class="form-text">This name appears in all product listings created from this form.</div>
+            <div class="form-text">If left blank, each product will use its Product Type name instead.</div>
           </div>
           <div id="pt-cards-wrap">
             <div style="padding:28px;text-align:center;color:#94a3b8;border:2px dashed var(--border);border-radius:10px">Complete Steps 1 &amp; 2 first.</div>

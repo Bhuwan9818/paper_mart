@@ -4,7 +4,8 @@
 function getVendorSubscription($pdo, $vendorId) {
     $stmt = $pdo->prepare("
         SELECT vs.*, sp.name AS plan_name, sp.slug, sp.product_limit, sp.enquiry_limit,
-               sp.image_limit, sp.analytics, sp.priority_listing, sp.color, sp.features
+               sp.image_limit, sp.analytics, sp.priority_listing, sp.color, sp.features,
+               sp.team_member_limit
         FROM vendor_subscriptions vs
         JOIN subscription_plans sp ON sp.id = vs.plan_id
         WHERE vs.vendor_id = ?
