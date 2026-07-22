@@ -514,12 +514,13 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 /* Small phone (≤480px): narrowest cards so 2+ are always visible */
 @media(max-width:480px){
   .cat-card { width: 155px; min-height: 182px; }
-}
-
-.compare-group{
+  .compare-group{
   display:grid;
   grid-template-columns: 1fr !important;
 }
+}
+
+
 </style>
 
 <script>
