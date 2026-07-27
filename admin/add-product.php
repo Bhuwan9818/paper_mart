@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $vendors    = $pdo->query("SELECT id,name,email,company FROM users WHERE role='vendor' AND status='active' ORDER BY name")->fetchAll();
 $industries = getAllIndustries($pdo);
 $pageTitle  = 'Add Product (Admin)';
-$activePage = 'products';
+$activePage = 'admin-add-products';
 include __DIR__ . '/../includes/head.php';
 ?>
 <meta name="base-url" content="<?= BASE_URL ?>">
