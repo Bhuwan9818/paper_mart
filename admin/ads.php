@@ -116,7 +116,7 @@ include __DIR__ . '/../includes/head.php';
 .ads-topbar h1::after{content:'';position:absolute;bottom:0;left:0;width:36px;height:3px;background:linear-gradient(90deg,var(--crimson),var(--gold-dark));border-radius:2px}
 .stats-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
 /* Premium tabs */
-.ads-tabs{display:flex;gap:0;margin-bottom:24px;background:var(--cream-light);border-radius:12px;padding:4px;border:1px solid var(--border-light)}
+.ads-tabs{display:flex;gap:10px;margin-bottom:24px;background:var(--cream-light);border-radius:12px;padding:4px;border:1px solid var(--border-light)}
 .ads-tab{flex:1;text-align:center;padding:10px 8px;font-size:13px;font-weight:600;border-radius:9px;text-decoration:none;color:var(--text-muted);transition:var(--transition);white-space:nowrap}
 .ads-tab.active{background:var(--crimson);color:#fff;box-shadow:0 2px 8px rgba(139,36,29,.25)}
 .ads-tab:hover:not(.active){background:var(--cream);color:var(--crimson)}
