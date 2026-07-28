@@ -82,6 +82,157 @@ $myAds->execute([$uid]); $myAds=$myAds->fetchAll();
 $pageTitle='Banner Ads'; $activePage='ads';
 include __DIR__ . '/../includes/head.php';
 ?>
+<script>
+/* Defined immediately after head.php (before any tab content) on purpose:
+   these are the onclick handlers used by the booking form below. Keeping
+   them this early means they're always available even if some later part
+   of the page fails to render for any reason. */
+let selectedPkgId=null, selectedSlotId=null, heroCapacityFull=false, lastAvailData=null;
+
+function selectPackage(el){
+  document.querySelectorAll('.pkg-select-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedPkgId=el.dataset.id;
+  document.getElementById('f-package-id').value=selectedPkgId;
+  document.getElementById('pkg-err').style.display='none';
+  const price=parseFloat(el.dataset.price);
+  document.getElementById('pay-amount').textContent='₹'+price.toLocaleString('en-IN',{minimumFractionDigits:0});
+  onDateChange();
+}
+
+function selectSlot(el){
+  if(el.classList.contains('full'))return; // guard: full/disabled slots never selectable
+  document.querySelectorAll('.slot-select-card:not(.full)').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedSlotId=el.dataset.id;
+  document.getElementById('f-slot-id').value=selectedSlotId;
+  document.getElementById('slot-err').style.display='none';
+  updateNoticeFromCache();
+}
+
+function onDateChange(){
+  const startEl=document.getElementById('start-date');
+  const dispEl=document.getElementById('end-date-display');
+  const pkgEl=document.querySelector('.pkg-select-card.selected');
+  if(!startEl||!dispEl)return;
+  if(!startEl.value||!pkgEl){dispEl.textContent='Select package + date';return;}
+  const days=parseInt(pkgEl.dataset.days);
+  const start=new Date(startEl.value);
+  start.setDate(start.getDate()+days-1);
+  dispEl.textContent=start.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  dispEl.style.color='var(--text)';
+  refreshSlotAvailability();
+}
+
+// Pulls fresh availability for every slot for the exact chosen date range,
+// then greys out / disables (removes click handler from) any slot that's
+// already fully booked for those dates — plus disables ALL slots at once if
+// the global 4-banner hero cap is already booked for that period.
+function refreshSlotAvailability(){
+  const startEl=document.getElementById('start-date');
+  const pkgEl=document.querySelector('.pkg-select-card.selected');
+  const globalBanner=document.getElementById('global-full-banner');
+  if(!startEl||!globalBanner)return;
+  if(!startEl.value||!pkgEl){ return; } // leave the "as of today" defaults showing
+
+  fetch('<?=BASE_URL?>/public/ajax/slot-availability.php?start='+startEl.value+'&days='+pkgEl.dataset.days)
+    .then(r=>r.json()).then(d=>{
+      if(!d.ok)return;
+      lastAvailData=d;
+      heroCapacityFull=!!d.globalFull;
+      globalBanner.style.display=heroCapacityFull?'block':'none';
+
+      document.querySelectorAll('.slot-select-card').forEach(card=>{
+        const sid=card.dataset.id;
+        const info=d.slots[sid];
+        if(!info)return;
+        const bar=document.getElementById('slot-bar-'+sid);
+        const label=document.getElementById('slot-label-'+sid);
+        const asof=document.getElementById('slot-asof-'+sid);
+        const isFull=info.full||heroCapacityFull; // full if slot itself is full OR global hero cap is full
+        const pct=info.max>0?Math.min(100,Math.round(info.used/info.max*100)):0;
+
+        card.classList.toggle('full',isFull);
+        card.onclick=isFull?null:function(){selectSlot(card);};
+        if(isFull) card.classList.remove('selected');
+        if(bar){ bar.style.width=pct+'%'; bar.style.background=isFull?'linear-gradient(90deg,#dc2626,#f87171)':''; }
+        if(label){
+          if(heroCapacityFull && !info.full){
+            label.style.color='#dc2626'; label.textContent='FULL (hero limit reached)';
+          } else if(isFull){
+            label.style.color='#dc2626'; label.textContent='FULL';
+          } else {
+            label.style.color='var(--success)'; label.textContent='✓ '+info.free+' slot'+(info.free>1?'s':'')+' available';
+          }
+        }
+        if(asof) asof.textContent='for '+d.start+(d.end!==d.start?' → '+d.end:'');
+      });
+
+      // If the slot the vendor had selected just became full for these dates, clear it
+      if(selectedSlotId){
+        const info=d.slots[selectedSlotId];
+        if(!info || info.full || heroCapacityFull){
+          selectedSlotId=null;
+          const slotIdField=document.getElementById('f-slot-id');
+          if(slotIdField) slotIdField.value='';
+        }
+      }
+      updateNoticeFromCache();
+    }).catch(()=>{});
+}
+
+function updateNoticeFromCache(){
+  const n=document.getElementById('avail-notice');
+  if(!n)return;
+  if(!lastAvailData||!selectedSlotId){n.style.display='none';return;}
+  const info=lastAvailData.slots[selectedSlotId];
+  if(!info){n.style.display='none';return;}
+  n.style.display='block';
+  if(heroCapacityFull){
+    n.style.background='#fee2e2';n.style.color='#dc2626';
+    n.textContent='❌ The homepage hero already has '+lastAvailData.globalMax+' active banners booked for these dates (across all slots). Please choose different dates.';
+  } else if(info.free>0){
+    n.style.background='#dcfce7';n.style.color='#16a34a';
+    n.textContent='✅ '+info.free+' slot'+(info.free>1?'s':'')+' available · '+lastAvailData.globalUsed+'/'+lastAvailData.globalMax+' hero banners booked for these dates.';
+  } else {
+    n.style.background='#fee2e2';n.style.color='#dc2626';
+    n.textContent='❌ This slot is fully booked for your dates. Please try different dates or another slot.';
+  }
+}
+
+function previewBanner(input){
+  const wrap=document.getElementById('banner-preview-wrap');
+  const warn=document.getElementById('banner-dim-warn');
+  if(!wrap)return;
+  if(!input.files[0]){wrap.innerHTML='<div style="text-align:center;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:4px">🖼️</div><div style="font-size:12.5px">Your banner will appear here</div></div>';wrap.classList.remove('has-img');return;}
+  const url=URL.createObjectURL(input.files[0]);
+  const img=document.createElement('img');
+  img.onload=function(){
+    const ratio=this.naturalWidth/this.naturalHeight;
+    if(warn) warn.style.display=Math.abs(ratio-8/3)<0.35?'none':'block';
+    URL.revokeObjectURL(url);
+  };
+  img.src=url; img.style.cssText='width:100%;height:100%;object-fit:cover';
+  wrap.innerHTML=''; wrap.appendChild(img); wrap.classList.add('has-img');
+}
+
+function validateBooking(){
+  let ok=true;
+  const pkgErr=document.getElementById('pkg-err'), slotErr=document.getElementById('slot-err');
+  if(!selectedPkgId){if(pkgErr)pkgErr.style.display='block';ok=false;const s=document.querySelector('.step-section');if(s)s.scrollIntoView({behavior:'smooth'});}
+  if(!selectedSlotId){if(slotErr){slotErr.style.display='block';if(ok)slotErr.scrollIntoView({behavior:'smooth'});}ok=false;}
+  if(ok&&heroCapacityFull){alert('The homepage hero already has the maximum number of active banners booked for these dates. Please choose different dates.');ok=false;}
+  return ok;
+}
+
+function openPayRefModal(adId,payId,price,pkgName){
+  document.getElementById('pr-adid').value=adId;
+  document.getElementById('pr-ref').value='';
+  document.getElementById('pr-info').innerHTML='<strong>'+pkgName+'</strong> &middot; ₹'+parseFloat(price).toFixed(0);
+  document.getElementById('payref-modal').classList.add('open');
+}
+</script>
+
 <style>
 /* ── VENDOR ADS — premium UI ────────────────────── */
 .ads-tabs{display:flex;gap:0;margin-bottom:24px;background:var(--cream-light);border-radius:12px;padding:4px;border:1px solid var(--border-light)}
@@ -440,144 +591,10 @@ include __DIR__ . '/../includes/head.php';
 </div>
 
 <script>
-let selectedPkgId=null, selectedSlotId=null, heroCapacityFull=false, lastAvailData=null;
-
-function selectPackage(el){
-  document.querySelectorAll('.pkg-select-card').forEach(c=>c.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedPkgId=el.dataset.id;
-  document.getElementById('f-package-id').value=selectedPkgId;
-  document.getElementById('pkg-err').style.display='none';
-  const price=parseFloat(el.dataset.price);
-  document.getElementById('pay-amount').textContent='₹'+price.toLocaleString('en-IN',{minimumFractionDigits:0});
-  onDateChange();
-}
-
-function selectSlot(el){
-  if(el.classList.contains('full'))return; // guard: full/disabled slots never selectable
-  document.querySelectorAll('.slot-select-card:not(.full)').forEach(c=>c.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedSlotId=el.dataset.id;
-  document.getElementById('f-slot-id').value=selectedSlotId;
-  document.getElementById('slot-err').style.display='none';
-  updateNoticeFromCache();
-}
-
-function onDateChange(){
-  const startEl=document.getElementById('start-date');
-  const dispEl=document.getElementById('end-date-display');
-  const pkgEl=document.querySelector('.pkg-select-card.selected');
-  if(!startEl.value||!pkgEl){dispEl.textContent='Select package + date';return;}
-  const days=parseInt(pkgEl.dataset.days);
-  const start=new Date(startEl.value);
-  start.setDate(start.getDate()+days-1);
-  dispEl.textContent=start.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  dispEl.style.color='var(--text)';
-  refreshSlotAvailability();
-}
-
-// Pulls fresh availability for every slot for the exact chosen date range,
-// then greys out / disables (removes click handler from) any slot that's
-// already fully booked for those dates — plus disables ALL slots at once if
-// the global 4-banner hero cap is already booked for that period.
-function refreshSlotAvailability(){
-  const startEl=document.getElementById('start-date');
-  const pkgEl=document.querySelector('.pkg-select-card.selected');
-  const globalBanner=document.getElementById('global-full-banner');
-  if(!startEl.value||!pkgEl){ return; } // leave the "as of today" defaults showing
-
-  fetch('<?=BASE_URL?>/public/ajax/slot-availability.php?start='+startEl.value+'&days='+pkgEl.dataset.days)
-    .then(r=>r.json()).then(d=>{
-      if(!d.ok)return;
-      lastAvailData=d;
-      heroCapacityFull=!!d.globalFull;
-      globalBanner.style.display=heroCapacityFull?'block':'none';
-
-      document.querySelectorAll('.slot-select-card').forEach(card=>{
-        const sid=card.dataset.id;
-        const info=d.slots[sid];
-        if(!info)return;
-        const bar=document.getElementById('slot-bar-'+sid);
-        const label=document.getElementById('slot-label-'+sid);
-        const asof=document.getElementById('slot-asof-'+sid);
-        const isFull=info.full||heroCapacityFull; // full if slot itself is full OR global hero cap is full
-        const pct=info.max>0?Math.min(100,Math.round(info.used/info.max*100)):0;
-
-        card.classList.toggle('full',isFull);
-        card.onclick=isFull?null:function(){selectSlot(card);};
-        if(isFull) card.classList.remove('selected');
-        bar.style.width=pct+'%';
-        bar.style.background=isFull?'linear-gradient(90deg,#dc2626,#f87171)':'';
-        if(heroCapacityFull && !info.full){
-          label.style.color='#dc2626'; label.textContent='FULL (hero limit reached)';
-        } else if(isFull){
-          label.style.color='#dc2626'; label.textContent='FULL';
-        } else {
-          label.style.color='var(--success)'; label.textContent='✓ '+info.free+' slot'+(info.free>1?'s':'')+' available';
-        }
-        asof.textContent='for '+d.start+(d.end!==d.start?' → '+d.end:'');
-      });
-
-      // If the slot the vendor had selected just became full for these dates, clear it
-      if(selectedSlotId){
-        const info=d.slots[selectedSlotId];
-        if(!info || info.full || heroCapacityFull){
-          selectedSlotId=null;
-          document.getElementById('f-slot-id').value='';
-        }
-      }
-      updateNoticeFromCache();
-    }).catch(()=>{});
-}
-
-function updateNoticeFromCache(){
-  const n=document.getElementById('avail-notice');
-  if(!lastAvailData||!selectedSlotId){n.style.display='none';return;}
-  const info=lastAvailData.slots[selectedSlotId];
-  if(!info){n.style.display='none';return;}
-  n.style.display='block';
-  if(heroCapacityFull){
-    n.style.background='#fee2e2';n.style.color='#dc2626';
-    n.textContent='❌ The homepage hero already has '+lastAvailData.globalMax+' active banners booked for these dates (across all slots). Please choose different dates.';
-  } else if(info.free>0){
-    n.style.background='#dcfce7';n.style.color='#16a34a';
-    n.textContent='✅ '+info.free+' slot'+(info.free>1?'s':'')+' available · '+lastAvailData.globalUsed+'/'+lastAvailData.globalMax+' hero banners booked for these dates.';
-  } else {
-    n.style.background='#fee2e2';n.style.color='#dc2626';
-    n.textContent='❌ This slot is fully booked for your dates. Please try different dates or another slot.';
-  }
-}
-
-function previewBanner(input){
-  const wrap=document.getElementById('banner-preview-wrap');
-  const warn=document.getElementById('banner-dim-warn');
-  if(!input.files[0]){wrap.innerHTML='<div style="text-align:center;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:4px">🖼️</div><div style="font-size:12.5px">Your banner will appear here</div></div>';wrap.classList.remove('has-img');return;}
-  const url=URL.createObjectURL(input.files[0]);
-  const img=document.createElement('img');
-  img.onload=function(){
-    const ratio=this.naturalWidth/this.naturalHeight;
-    warn.style.display=Math.abs(ratio-8/3)<0.35?'none':'block';
-    URL.revokeObjectURL(url);
-  };
-  img.src=url; img.style.cssText='width:100%;height:100%;object-fit:cover';
-  wrap.innerHTML=''; wrap.appendChild(img); wrap.classList.add('has-img');
-}
-
-function validateBooking(){
-  let ok=true;
-  if(!selectedPkgId){document.getElementById('pkg-err').style.display='block';ok=false;document.querySelector('.step-section').scrollIntoView({behavior:'smooth'});}
-  if(!selectedSlotId){document.getElementById('slot-err').style.display='block';if(ok)document.getElementById('slot-err').scrollIntoView({behavior:'smooth'});ok=false;}
-  if(ok&&heroCapacityFull){alert('The homepage hero already has the maximum number of active banners booked for these dates. Please choose different dates.');ok=false;}
-  return ok;
-}
-
-function openPayRefModal(adId,payId,price,pkgName){
-  document.getElementById('pr-adid').value=adId;
-  document.getElementById('pr-ref').value='';
-  document.getElementById('pr-info').innerHTML='<strong>'+pkgName+'</strong> &middot; ₹'+parseFloat(price).toFixed(0);
-  document.getElementById('payref-modal').classList.add('open');
-}
-document.getElementById('payref-modal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+document.addEventListener('DOMContentLoaded', function(){
+  const modal=document.getElementById('payref-modal');
+  if(modal) modal.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+});
 </script>
 
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
