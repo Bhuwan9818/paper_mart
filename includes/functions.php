@@ -3,6 +3,32 @@
 // includes/functions.php — Shared helper functions
 // ============================================================
 
+// ---- Hero banner capacity (self-healing) ----
+// These MUST exist for the ads/banner booking system (vendor/ads.php,
+// admin/ads.php, public/index.php, public/ajax/*.php) to work. Defined here
+// with guards so this file alone always makes them available, even if
+// config.php on a given server doesn't (yet) define the constant.
+if (!defined('MAX_ACTIVE_HERO_BANNERS')) {
+    define('MAX_ACTIVE_HERO_BANNERS', 4); // max banners shown at once in the homepage hero
+}
+if (!function_exists('getGlobalActiveBannerCount')) {
+    function getGlobalActiveBannerCount($pdo, $startDate, $endDate, $excludeAdId = null) {
+        $sql = "SELECT COUNT(*) FROM banner_ads
+                WHERE status IN ('pending','approved','running')
+                  AND start_date <= ? AND end_date >= ?";
+        $params = [$endDate, $startDate];
+        if ($excludeAdId) { $sql .= " AND id != ?"; $params[] = $excludeAdId; }
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+}
+if (!function_exists('isHeroCapacityAvailable')) {
+    function isHeroCapacityAvailable($pdo, $startDate, $endDate, $excludeAdId = null) {
+        return getGlobalActiveBannerCount($pdo, $startDate, $endDate, $excludeAdId) < MAX_ACTIVE_HERO_BANNERS;
+    }
+}
+
 // ---- Notification helpers ----
 function addNotification($pdo, $userId, $title, $message = '', $link = '') {
     $stmt = $pdo->prepare("INSERT INTO notifications (user_id, title, message, link) VALUES (?, ?, ?, ?)");
