@@ -39,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ov = $pdo->prepare("SELECT COUNT(*) FROM banner_ads WHERE slot_id=? AND status IN('approved','running','pending') AND start_date<=? AND end_date>=?");
                 $ov->execute([$slotId,$endDate,$startDate]);
                 if ($ov->fetchColumn() >= $sr['max_concurrent']) $errors[] = 'This slot is fully booked for your selected dates. Please try different dates or a different slot.';
+                elseif (!isHeroCapacityAvailable($pdo, $startDate, $endDate)) $errors[] = 'The homepage hero can only show '.MAX_ACTIVE_HERO_BANNERS.' active banners at a time, and that limit is already booked for these dates (across all slots). Please choose different dates.';
             }
         }
         if (!$errors) {
@@ -83,7 +84,7 @@ include __DIR__ . '/../includes/head.php';
 ?>
 <style>
 /* ── VENDOR ADS — premium UI ────────────────────── */
-.ads-tabs{display:flex;gap:10px;margin-bottom:24px;background:var(--cream-light);border-radius:12px;padding:4px;border:1px solid var(--border-light)}
+.ads-tabs{display:flex;gap:0;margin-bottom:24px;background:var(--cream-light);border-radius:12px;padding:4px;border:1px solid var(--border-light)}
 .ads-tab{flex:1;text-align:center;padding:10px 12px;font-size:13.5px;font-weight:600;border-radius:9px;text-decoration:none;color:var(--text-muted);transition:var(--transition)}
 .ads-tab.active{background:var(--crimson);color:#fff;box-shadow:0 2px 8px rgba(139,36,29,.25)}
 .ads-tab:hover:not(.active){background:var(--cream);color:var(--crimson)}
@@ -268,33 +269,9 @@ include __DIR__ . '/../includes/head.php';
           <div id="pkg-err" style="display:none;font-size:12.5px;color:#dc2626;margin-top:6px">⚠️ Please select a package.</div>
         </div>
 
-        <!-- Step 2: Time Slot -->
+        <!-- Step 2: Dates (chosen before slot, since availability depends on the date range) -->
         <div class="step-section">
-          <div class="step-header"><div class="step-num">2</div><div class="step-title">Select a Time Slot</div></div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
-            <?php foreach($slots as $s):
-              $today=date('Y-m-d');
-              $usedNow=$pdo->prepare("SELECT COUNT(*) FROM banner_ads WHERE slot_id=? AND status IN('approved','running','pending') AND start_date<=? AND end_date>=?");
-              $usedNow->execute([$s['id'],$today,$today]); $usedNow=(int)$usedNow->fetchColumn();
-              $freeNow=$s['max_concurrent']-$usedNow; $isFull=$freeNow<=0;
-              $fillPct=min(100,$s['max_concurrent']>0?round($usedNow/$s['max_concurrent']*100):0);
-            ?>
-            <div class="slot-select-card <?= $isFull?'full':'' ?>" data-id="<?=$s['id']?>" data-max="<?=$s['max_concurrent']?>" onclick="<?= $isFull?'':'selectSlot(this)' ?>">
-              <div style="font-weight:700;font-size:13px;margin-bottom:2px"><?= sanitize($s['name']) ?></div>
-              <div class="slot-time-label"><?=substr($s['start_time'],0,5)?>–<?=substr($s['end_time'],0,5)?></div>
-              <div class="slot-fill-mini"><div class="slot-fill-mini-bar" style="width:<?=$fillPct?>%;<?=$isFull?'background:linear-gradient(90deg,#dc2626,#f87171)':''?>"></div></div>
-              <div style="font-size:11.5px;color:<?=$isFull?'#dc2626':'var(--success)'?>;font-weight:600"><?=$isFull?'FULL':'✓ '.$freeNow.' slot'.($freeNow>1?'s':'').' available'?></div>
-              <?php if($s['description']): ?><div style="font-size:10.5px;color:var(--text-muted);margin-top:4px"><?=sanitize($s['description'])?></div><?php endif; ?>
-            </div>
-            <?php endforeach; ?>
-          </div>
-          <div id="slot-err" style="display:none;font-size:12.5px;color:#dc2626;margin-top:6px">⚠️ Please select a time slot.</div>
-          <div id="avail-notice" style="display:none;font-size:12.5px;margin-top:10px;padding:8px 12px;border-radius:8px"></div>
-        </div>
-
-        <!-- Step 3: Dates -->
-        <div class="step-section">
-          <div class="step-header"><div class="step-num">3</div><div class="step-title">Set Your Start Date</div></div>
+          <div class="step-header"><div class="step-num">2</div><div class="step-title">Set Your Start Date</div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div class="form-group">
               <label class="form-label">Start Date <span class="req">*</span></label>
@@ -305,6 +282,33 @@ include __DIR__ . '/../includes/head.php';
               <div id="end-date-display" style="height:42px;display:flex;align-items:center;padding:0 14px;background:var(--cream-light);border:1.5px solid var(--border-light);border-radius:var(--radius-sm);font-size:13.5px;color:var(--text-muted);border-radius:8px">Select package + date</div>
             </div>
           </div>
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:8px">Pick a package and date first — slot availability below updates for those exact dates.</div>
+        </div>
+
+        <!-- Step 3: Time Slot -->
+        <div class="step-section">
+          <div class="step-header"><div class="step-num">3</div><div class="step-title">Select a Time Slot</div></div>
+          <div id="global-full-banner" style="display:none;font-size:12.5px;font-weight:600;color:#dc2626;background:#fee2e2;border-radius:8px;padding:10px 12px;margin-bottom:10px">❌ The homepage hero already has <?= MAX_ACTIVE_HERO_BANNERS ?> active banners booked for these dates (across all slots). Every slot is disabled — please choose different dates.</div>
+          <div id="slot-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+            <?php foreach($slots as $s):
+              $today=date('Y-m-d');
+              $usedNow=$pdo->prepare("SELECT COUNT(*) FROM banner_ads WHERE slot_id=? AND status IN('approved','running','pending') AND start_date<=? AND end_date>=?");
+              $usedNow->execute([$s['id'],$today,$today]); $usedNow=(int)$usedNow->fetchColumn();
+              $freeNow=$s['max_concurrent']-$usedNow; $isFull=$freeNow<=0;
+              $fillPct=min(100,$s['max_concurrent']>0?round($usedNow/$s['max_concurrent']*100):0);
+            ?>
+            <div class="slot-select-card <?= $isFull?'full':'' ?>" id="slot-card-<?=$s['id']?>" data-id="<?=$s['id']?>" data-max="<?=$s['max_concurrent']?>" onclick="<?= $isFull?'':'selectSlot(this)' ?>">
+              <div style="font-weight:700;font-size:13px;margin-bottom:2px"><?= sanitize($s['name']) ?></div>
+              <div class="slot-time-label"><?=substr($s['start_time'],0,5)?>–<?=substr($s['end_time'],0,5)?></div>
+              <div class="slot-fill-mini"><div class="slot-fill-mini-bar" id="slot-bar-<?=$s['id']?>" style="width:<?=$fillPct?>%;<?=$isFull?'background:linear-gradient(90deg,#dc2626,#f87171)':''?>"></div></div>
+              <div id="slot-label-<?=$s['id']?>" style="font-size:11.5px;color:<?=$isFull?'#dc2626':'var(--success)'?>;font-weight:600"><?=$isFull?'FULL':'✓ '.$freeNow.' slot'.($freeNow>1?'s':'').' available'?></div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px" id="slot-asof-<?=$s['id']?>">as of today — pick a date above for exact availability</div>
+              <?php if($s['description']): ?><div style="font-size:10.5px;color:var(--text-muted);margin-top:4px"><?=sanitize($s['description'])?></div><?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <div id="slot-err" style="display:none;font-size:12.5px;color:#dc2626;margin-top:6px">⚠️ Please select a time slot.</div>
+          <div id="avail-notice" style="display:none;font-size:12.5px;margin-top:10px;padding:8px 12px;border-radius:8px"></div>
         </div>
 
         <!-- Step 4: Banner Image -->
@@ -362,9 +366,26 @@ include __DIR__ . '/../includes/head.php';
       <div class="info-card">
         <div class="info-card-header">📋 How It Works</div>
         <div class="info-card-body">
-          <?php foreach([['1','Pick a package','Choose duration and price that fits your goal.'],['2','Choose a slot','Each slot runs during a specific time window daily.'],['3','Upload banner','Designed at 1600×600px for best results.'],['4','Pay & submit','Transfer and paste the UTR. We verify in 24h.'],['5','Go live 🚀','Your banner rotates automatically on the homepage.']] as [$n,$t,$d]): ?>
+          <?php foreach([['1','Pick a package','Choose duration and price that fits your goal.'],['2','Pick your dates','Slot availability updates live for those exact dates.'],['3','Choose a slot','Full slots for your dates are greyed out automatically.'],['4','Upload banner','Designed at 1600×600px for best results.'],['5','Pay & submit','Transfer and paste the UTR. We verify in 24h.'],['6','Go live 🚀','Your banner rotates automatically on the homepage.']] as [$n,$t,$d]): ?>
           <div class="how-step"><div class="how-num"><?=$n?></div><div><div style="font-weight:600;font-size:12.5px"><?=$t?></div><div style="font-size:11.5px;color:var(--text-muted);margin-top:2px"><?=$d?></div></div></div>
           <?php endforeach; ?>
+        </div>
+      </div>
+
+      <?php
+        $todayG = date('Y-m-d');
+        $globalUsedToday = getGlobalActiveBannerCount($pdo, $todayG, $todayG);
+        $globalFreeToday = max(0, MAX_ACTIVE_HERO_BANNERS - $globalUsedToday);
+        $globalFullToday = $globalFreeToday <= 0;
+      ?>
+      <div class="info-card">
+        <div class="info-card-header">🎯 Hero Banner Capacity Today</div>
+        <div class="info-card-body">
+          <div class="slot-avail-row">
+            <div><div style="font-size:13px;font-weight:600">All Slots Combined</div><div style="font-size:11px;color:var(--text-muted)">Max <?= MAX_ACTIVE_HERO_BANNERS ?> banners shown at once</div></div>
+            <div style="text-align:right"><div style="font-size:12px;font-weight:700;color:<?=$globalFullToday?'#dc2626':'#16a34a'?>"><?=$globalFullToday?'FULL':$globalFreeToday.' free'?></div><div style="font-size:10px;color:var(--text-muted)"><?=$globalUsedToday?>/<?=MAX_ACTIVE_HERO_BANNERS?></div></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">This is checked across every time slot combined. Even if your chosen slot has room, booking is blocked once <?=MAX_ACTIVE_HERO_BANNERS?> banners are already active for those dates.</div>
         </div>
       </div>
 
@@ -419,7 +440,7 @@ include __DIR__ . '/../includes/head.php';
 </div>
 
 <script>
-let selectedPkgId=null, selectedSlotId=null;
+let selectedPkgId=null, selectedSlotId=null, heroCapacityFull=false, lastAvailData=null;
 
 function selectPackage(el){
   document.querySelectorAll('.pkg-select-card').forEach(c=>c.classList.remove('selected'));
@@ -433,12 +454,13 @@ function selectPackage(el){
 }
 
 function selectSlot(el){
+  if(el.classList.contains('full'))return; // guard: full/disabled slots never selectable
   document.querySelectorAll('.slot-select-card:not(.full)').forEach(c=>c.classList.remove('selected'));
   el.classList.add('selected');
   selectedSlotId=el.dataset.id;
   document.getElementById('f-slot-id').value=selectedSlotId;
   document.getElementById('slot-err').style.display='none';
-  checkLiveAvailability();
+  updateNoticeFromCache();
 }
 
 function onDateChange(){
@@ -451,23 +473,79 @@ function onDateChange(){
   start.setDate(start.getDate()+days-1);
   dispEl.textContent=start.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   dispEl.style.color='var(--text)';
-  checkLiveAvailability();
+  refreshSlotAvailability();
 }
 
-function checkLiveAvailability(){
-  const n=document.getElementById('avail-notice');
+// Pulls fresh availability for every slot for the exact chosen date range,
+// then greys out / disables (removes click handler from) any slot that's
+// already fully booked for those dates — plus disables ALL slots at once if
+// the global 4-banner hero cap is already booked for that period.
+function refreshSlotAvailability(){
   const startEl=document.getElementById('start-date');
   const pkgEl=document.querySelector('.pkg-select-card.selected');
-  if(!selectedSlotId||!startEl.value||!pkgEl){n.style.display='none';return;}
-  fetch('<?=BASE_URL?>/public/ajax/check-ad-slot.php?slot_id='+selectedSlotId+'&start='+startEl.value+'&days='+pkgEl.dataset.days)
+  const globalBanner=document.getElementById('global-full-banner');
+  if(!startEl.value||!pkgEl){ return; } // leave the "as of today" defaults showing
+
+  fetch('<?=BASE_URL?>/public/ajax/slot-availability.php?start='+startEl.value+'&days='+pkgEl.dataset.days)
     .then(r=>r.json()).then(d=>{
-      const maxEl=document.querySelector('.slot-select-card.selected');
-      const max=maxEl?parseInt(maxEl.dataset.max):3;
-      const free=max-(d.used||0);
-      n.style.display='block';
-      if(free>0){n.style.background='#dcfce7';n.style.color='#16a34a';n.textContent='✅ '+free+' slot'+(free>1?'s':'')+' available for your selected dates.';}
-      else{n.style.background='#fee2e2';n.style.color='#dc2626';n.textContent='❌ This slot is fully booked for your dates. Please try different dates or another slot.';}
-    }).catch(()=>{n.style.display='none';});
+      if(!d.ok)return;
+      lastAvailData=d;
+      heroCapacityFull=!!d.globalFull;
+      globalBanner.style.display=heroCapacityFull?'block':'none';
+
+      document.querySelectorAll('.slot-select-card').forEach(card=>{
+        const sid=card.dataset.id;
+        const info=d.slots[sid];
+        if(!info)return;
+        const bar=document.getElementById('slot-bar-'+sid);
+        const label=document.getElementById('slot-label-'+sid);
+        const asof=document.getElementById('slot-asof-'+sid);
+        const isFull=info.full||heroCapacityFull; // full if slot itself is full OR global hero cap is full
+        const pct=info.max>0?Math.min(100,Math.round(info.used/info.max*100)):0;
+
+        card.classList.toggle('full',isFull);
+        card.onclick=isFull?null:function(){selectSlot(card);};
+        if(isFull) card.classList.remove('selected');
+        bar.style.width=pct+'%';
+        bar.style.background=isFull?'linear-gradient(90deg,#dc2626,#f87171)':'';
+        if(heroCapacityFull && !info.full){
+          label.style.color='#dc2626'; label.textContent='FULL (hero limit reached)';
+        } else if(isFull){
+          label.style.color='#dc2626'; label.textContent='FULL';
+        } else {
+          label.style.color='var(--success)'; label.textContent='✓ '+info.free+' slot'+(info.free>1?'s':'')+' available';
+        }
+        asof.textContent='for '+d.start+(d.end!==d.start?' → '+d.end:'');
+      });
+
+      // If the slot the vendor had selected just became full for these dates, clear it
+      if(selectedSlotId){
+        const info=d.slots[selectedSlotId];
+        if(!info || info.full || heroCapacityFull){
+          selectedSlotId=null;
+          document.getElementById('f-slot-id').value='';
+        }
+      }
+      updateNoticeFromCache();
+    }).catch(()=>{});
+}
+
+function updateNoticeFromCache(){
+  const n=document.getElementById('avail-notice');
+  if(!lastAvailData||!selectedSlotId){n.style.display='none';return;}
+  const info=lastAvailData.slots[selectedSlotId];
+  if(!info){n.style.display='none';return;}
+  n.style.display='block';
+  if(heroCapacityFull){
+    n.style.background='#fee2e2';n.style.color='#dc2626';
+    n.textContent='❌ The homepage hero already has '+lastAvailData.globalMax+' active banners booked for these dates (across all slots). Please choose different dates.';
+  } else if(info.free>0){
+    n.style.background='#dcfce7';n.style.color='#16a34a';
+    n.textContent='✅ '+info.free+' slot'+(info.free>1?'s':'')+' available · '+lastAvailData.globalUsed+'/'+lastAvailData.globalMax+' hero banners booked for these dates.';
+  } else {
+    n.style.background='#fee2e2';n.style.color='#dc2626';
+    n.textContent='❌ This slot is fully booked for your dates. Please try different dates or another slot.';
+  }
 }
 
 function previewBanner(input){
@@ -489,6 +567,7 @@ function validateBooking(){
   let ok=true;
   if(!selectedPkgId){document.getElementById('pkg-err').style.display='block';ok=false;document.querySelector('.step-section').scrollIntoView({behavior:'smooth'});}
   if(!selectedSlotId){document.getElementById('slot-err').style.display='block';if(ok)document.getElementById('slot-err').scrollIntoView({behavior:'smooth'});ok=false;}
+  if(ok&&heroCapacityFull){alert('The homepage hero already has the maximum number of active banners booked for these dates. Please choose different dates.');ok=false;}
   return ok;
 }
 
