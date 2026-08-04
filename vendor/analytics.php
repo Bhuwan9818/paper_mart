@@ -20,7 +20,7 @@ for ($i=5; $i>=0; $i--) {
 // Real enquiry counts per month
 $enqData = [];
 foreach ($months as $m) {
-    $s = $pdo->prepare("SELECT COUNT(*) FROM enquiries WHERE vendor_id=? AND DATE_FORMAT(created_at,'%Y-%m')=?");
+    $s = $pdo->prepare("SELECT COUNT(*) FROM web_enquiries WHERE vendor_id=? AND DATE_FORMAT(created_at,'%Y-%m')=?");
     $s->execute([$uid,$m]); $enqData[] = (int)$s->fetchColumn();
 }
 // Real product counts per month
@@ -39,7 +39,7 @@ try {
 } catch (Exception $e) {}
 
 // Top products by enquiry
-$topProducts = $pdo->prepare("SELECT p.name, COUNT(e.id) AS enq_count FROM products p LEFT JOIN enquiries e ON e.product_id=p.id WHERE p.vendor_id=? GROUP BY p.id ORDER BY enq_count DESC LIMIT 5");
+$topProducts = $pdo->prepare("SELECT p.name, COUNT(we.id) AS enq_count FROM products p LEFT JOIN web_enquiries we ON we.product_id=p.id WHERE p.vendor_id=? GROUP BY p.id ORDER BY enq_count DESC LIMIT 5");
 $topProducts->execute([$uid]); $topProducts=$topProducts->fetchAll();
 
 // Summary totals

@@ -16,6 +16,19 @@ define('BASE_URL', '/dashv10_Fixed');
 define('UPLOAD_DIR', __DIR__ . '/assets/uploads/');
 define('UPLOAD_URL', BASE_URL . '/assets/uploads/');
 
+// Hard cap on how many vendor ad banners can be pending/approved/running
+// at once for any overlapping date range — keeps the homepage hero to a
+// maximum of this many rotating banners at any given time.
+define('MAX_ACTIVE_HERO_BANNERS', 4);
+
+// ---- Razorpay payment gateway ----
+// Get these from https://dashboard.razorpay.com/app/keys (Test mode first).
+// Test keys start with "rzp_test_", live keys with "rzp_live_".
+define('RAZORPAY_KEY_ID',     'rzp_test_TJGlHQe100WEgc');
+define('RAZORPAY_KEY_SECRET', 'rHvpkoCypuRpaj6VwagCCgRc');
+// From Dashboard → Settings → Webhooks, after you create a webhook (see setup guide).
+define('RAZORPAY_WEBHOOK_SECRET', 'YOUR_WEBHOOK_SECRET_HERE');
+
 // Connect via PDO
 try {
     $pdo = new PDO(

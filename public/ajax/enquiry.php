@@ -7,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD']!=='POST'){ echo json_encode(['ok'=>false,'msg'=>'
 
 $productId = (int)($_POST['product_id']??0);
 $vendorId  = (int)($_POST['vendor_id']??0);
+$customerId = (isset($_SESSION['role']) && $_SESSION['role']==='customer') ? (int)$_SESSION['user_id'] : null;
 $name      = trim($_POST['name']??'');
 $email     = trim($_POST['email']??'');
 $phone     = trim($_POST['phone']??'');
@@ -19,8 +20,8 @@ if (!$name||!$email||!$vendorId){ echo json_encode(['ok'=>false,'msg'=>'Please f
 if (!filter_var($email,FILTER_VALIDATE_EMAIL)){ echo json_encode(['ok'=>false,'msg'=>'Invalid email address.']); exit; }
 
 try {
-    $pdo->prepare("INSERT INTO web_enquiries (product_id,vendor_id,name,email,phone,company,city,message,qty_needed,ip_address) VALUES(?,?,?,?,?,?,?,?,?,?)")
-        ->execute([$productId?:null,$vendorId,$name,$email,$phone,$company,$city,$message,$qty,$_SERVER['REMOTE_ADDR']??'']);
+    $pdo->prepare("INSERT INTO web_enquiries (product_id,vendor_id,customer_id,name,email,phone,company,city,message,qty_needed,ip_address) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([$productId?:null,$vendorId,$customerId,$name,$email,$phone,$company,$city,$message,$qty,$_SERVER['REMOTE_ADDR']??'']);
     // Notify vendor
     try{ $pdo->prepare("INSERT INTO notifications (user_id,title,message,link) VALUES(?,?,?,?)")->execute([$vendorId,"New enquiry from $name","Product enquiry received from $company $city. Email: $email",'/dashv10_Fixed/vendor/enquiries.php']); }catch(Exception $e){}
     echo json_encode(['ok'=>true,'msg'=>'Your enquiry has been sent! The vendor will contact you within 24 hours.']);

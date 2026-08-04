@@ -1,11 +1,14 @@
 <?php
 // public/ajax/check-ad-slot.php
-// Returns how many banner_ads bookings are already occupying
-// a given slot for a proposed date range.
-// Called by the vendor booking form's live availability check.
+// NOTE: superseded by public/ajax/slot-availability.php (which checks every
+// slot in one call). Kept working here in case anything still calls it.
+// Returns how many banner_ads bookings are already occupying a given slot
+// for a proposed date range — checked per-slot only, since slots are
+// independent, non-overlapping times of day.
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once dirname(__DIR__, 2) . '/config.php';
+require_once dirname(__DIR__, 2) . '/includes/functions.php';
 header('Content-Type: application/json');
 
 $slotId = (int)($_GET['slot_id'] ?? 0);
@@ -19,13 +22,9 @@ if (!$slotId || !$start || !strtotime($start)) {
 
 $end = date('Y-m-d', strtotime($start . ' +' . ($days - 1) . ' days'));
 
-$stmt = $pdo->prepare(
-    "SELECT COUNT(*) FROM banner_ads
-     WHERE slot_id = ?
-       AND status IN ('pending','approved','running')
-       AND start_date <= ?
-       AND end_date   >= ?"
-);
-$stmt->execute([$slotId, $end, $start]);
+$used = getSlotActiveBannerCount($pdo, $slotId, $start, $end);
 
-echo json_encode(['ok' => true, 'used' => (int)$stmt->fetchColumn()]);
+echo json_encode([
+    'ok'   => true,
+    'used' => $used,
+]);

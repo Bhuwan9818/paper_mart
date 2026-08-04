@@ -16,6 +16,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status = in_array($_POST['status'], ['pending','approved','rejected','running','paused','completed','cancelled']) ? $_POST['status'] : 'pending';
         $note   = trim($_POST['admin_note'] ?? '');
         $order  = (int)($_POST['sort_order'] ?? 0);
+
+        if (in_array($status, ['approved','running'])) {
+            $adRow = $pdo->prepare("SELECT ba.start_date, ba.end_date, ba.slot_id, s.max_concurrent, s.name AS slot_name FROM banner_ads ba JOIN ad_slots s ON s.id=ba.slot_id WHERE ba.id=?");
+            $adRow->execute([$id]); $adRow=$adRow->fetch();
+            if ($adRow && !isSlotCapacityAvailable($pdo, $adRow['slot_id'], $adRow['max_concurrent'], $adRow['start_date'], $adRow['end_date'], $id)) {
+                flash('error', 'Cannot set this ad live — the "'.$adRow['slot_name'].'" slot already has '.$adRow['max_concurrent'].' active banners booked for these dates. Pause, reject, or reschedule another ad in that same slot first.');
+                header('Location: ads.php?tab=bookings'); exit;
+            }
+        }
+
         $pdo->prepare("UPDATE banner_ads SET status=?, admin_note=?, sort_order=? WHERE id=?")->execute([$status, $note, $order, $id]);
         if ($status === 'approved') {
             $pdo->prepare("UPDATE banner_ads SET status='running' WHERE id=? AND start_date<=CURDATE() AND end_date>=CURDATE() AND (SELECT COUNT(*) FROM ad_payments WHERE ad_id=? AND status='paid')>0")->execute([$id,$id]);
@@ -45,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'payment_status') {
         $id=(int)$_POST['id']; $status=in_array($_POST['status'],['pending','paid','failed','refunded'])?$_POST['status']:'pending'; $ref=trim($_POST['payment_ref']??'');
         $pdo->prepare("UPDATE ad_payments SET status=?,payment_ref=?,paid_at=? WHERE id=?")->execute([$status,$ref,$status==='paid'?date('Y-m-d H:i:s'):null,$id]);
-        if($status==='paid'){$pdo->prepare("UPDATE banner_ads ba JOIN ad_payments ap ON ap.ad_id=ba.id SET ba.status=IF(ba.start_date<=CURDATE() AND ba.end_date>=CURDATE(),'running','approved') WHERE ap.id=? AND ba.status='pending'")->execute([$id]);}
+        if($status==='paid'){$pdo->prepare("UPDATE banner_ads ba JOIN ad_payments ap ON ap.ad_id=ba.id JOIN ad_slots sl ON sl.id=ba.slot_id SET ba.status=IF(ba.start_date<=CURDATE() AND ba.end_date>=CURDATE(),'running','approved') WHERE ap.id=? AND ba.status='pending' AND (SELECT COUNT(*) FROM banner_ads b2 WHERE b2.id<>ba.id AND b2.slot_id=ba.slot_id AND b2.status IN('approved','running') AND b2.start_date<=ba.end_date AND b2.end_date>=ba.start_date) < sl.max_concurrent")->execute([$id]);}
         flash('success','Payment updated.'); header('Location: ads.php?tab=payments'); exit;
     }
     // Fallback banner CRUD (when no vendor ads are running)
@@ -83,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Auto-status engine
 try {
-    $pdo->query("UPDATE banner_ads ba SET ba.status='running' WHERE ba.status='approved' AND ba.start_date<=CURDATE() AND ba.end_date>=CURDATE() AND (SELECT COUNT(*) FROM ad_payments WHERE ad_id=ba.id AND status='paid')>0");
+    $pdo->query("UPDATE banner_ads ba JOIN ad_slots sl ON sl.id=ba.slot_id SET ba.status='running' WHERE ba.status='approved' AND ba.start_date<=CURDATE() AND ba.end_date>=CURDATE() AND (SELECT COUNT(*) FROM ad_payments WHERE ad_id=ba.id AND status='paid')>0 AND (SELECT COUNT(*) FROM banner_ads b2 WHERE b2.id<>ba.id AND b2.slot_id=ba.slot_id AND b2.status='running' AND b2.start_date<=ba.end_date AND b2.end_date>=ba.start_date) < sl.max_concurrent");
     $pdo->query("UPDATE banner_ads SET status='completed' WHERE status IN('running','approved') AND end_date<CURDATE()");
 } catch(Exception $e){}
 
@@ -102,6 +112,14 @@ $packages=$pdo->query("SELECT * FROM ad_packages ORDER BY sort_order,id")->fetch
 $slots=$pdo->query("SELECT s.*,(SELECT COUNT(*) FROM banner_ads WHERE slot_id=s.id AND status IN('running','approved')) AS active_ads FROM ad_slots s ORDER BY sort_order,start_time")->fetchAll();
 $payments=$pdo->query("SELECT ap.*,u.name AS vendor_name,u.company,p.name AS package_name,ba.title AS ad_title,ba.start_date,ba.end_date FROM ad_payments ap JOIN users u ON u.id=ap.vendor_id JOIN ad_packages p ON p.id=ap.package_id JOIN banner_ads ba ON ba.id=ap.ad_id ORDER BY ap.created_at DESC LIMIT 100")->fetchAll();
 $stats=['total'=>$pdo->query("SELECT COUNT(*) FROM banner_ads")->fetchColumn(),'running'=>$pdo->query("SELECT COUNT(*) FROM banner_ads WHERE status='running'")->fetchColumn(),'pending'=>$pdo->query("SELECT COUNT(*) FROM banner_ads WHERE status='pending'")->fetchColumn(),'revenue'=>$pdo->query("SELECT COALESCE(SUM(amount),0) FROM ad_payments WHERE status='paid'")->fetchColumn()];
+// How many of today's time slots are already at full capacity (per-slot, not global)
+$slotsFullToday = (int)$pdo->query(
+    "SELECT COUNT(*) FROM ad_slots s WHERE s.is_active=1 AND (
+        SELECT COUNT(*) FROM banner_ads b WHERE b.slot_id=s.id AND b.status IN('approved','running','pending')
+          AND b.start_date<=CURDATE() AND b.end_date>=CURDATE()
+     ) >= s.max_concurrent"
+)->fetchColumn();
+$slotsTotal = (int)$pdo->query("SELECT COUNT(*) FROM ad_slots WHERE is_active=1")->fetchColumn();
 // Fallback banners (admin-managed, shown when no vendor ads are running)
 try { $fallbackBanners=$pdo->query("SELECT * FROM banners ORDER BY sort_order ASC,id ASC")->fetchAll(); } catch(Exception $e){ $fallbackBanners=[]; }
 $runningCount=(int)$pdo->query("SELECT COUNT(*) FROM banner_ads WHERE status='running'")->fetchColumn();
@@ -116,7 +134,7 @@ include __DIR__ . '/../includes/head.php';
 .ads-topbar h1::after{content:'';position:absolute;bottom:0;left:0;width:36px;height:3px;background:linear-gradient(90deg,var(--crimson),var(--gold-dark));border-radius:2px}
 .stats-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
 /* Premium tabs */
-.ads-tabs{display:flex;gap:10px;margin-bottom:24px;background:var(--cream-light);border-radius:12px;padding:4px;border:1px solid var(--border-light)}
+.ads-tabs{display:flex;gap:0;margin-bottom:24px;background:var(--cream-light);border-radius:12px;padding:4px;border:1px solid var(--border-light)}
 .ads-tab{flex:1;text-align:center;padding:10px 8px;font-size:13px;font-weight:600;border-radius:9px;text-decoration:none;color:var(--text-muted);transition:var(--transition);white-space:nowrap}
 .ads-tab.active{background:var(--crimson);color:#fff;box-shadow:0 2px 8px rgba(139,36,29,.25)}
 .ads-tab:hover:not(.active){background:var(--cream);color:var(--crimson)}
@@ -198,7 +216,7 @@ include __DIR__ . '/../includes/head.php';
       <div class="stat-header"><div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:6px">Total Bookings</div><div style="font-size:28px;font-weight:800;color:var(--crimson)"><?= number_format($stats['total']) ?></div></div><div class="stat-icon indigo">🎯</div></div>
     </div>
     <div class="stat-card green">
-      <div class="stat-header"><div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:6px">Running Now</div><div style="font-size:28px;font-weight:800;color:var(--success)"><?= $stats['running'] ?></div></div><div class="stat-icon green">📡</div></div>
+      <div class="stat-header"><div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:6px">Slots Full Today</div><div style="font-size:28px;font-weight:800;color:<?= $slotsFullToday>0?'#dc2626':'var(--success)' ?>"><?= $slotsFullToday ?>/<?= $slotsTotal ?></div><div style="font-size:10.5px;color:var(--text-muted);margin-top:2px"><?= $stats['running'] ?> running overall</div></div><div class="stat-icon green">📡</div></div>
     </div>
     <div class="stat-card amber">
       <div class="stat-header"><div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:6px">Awaiting Approval</div><div style="font-size:28px;font-weight:800;color:var(--gold-dark)"><?= $stats['pending'] ?></div></div><div class="stat-icon amber">⏳</div></div>

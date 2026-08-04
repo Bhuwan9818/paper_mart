@@ -164,7 +164,7 @@ $industries = $pdo->query(
 
 <!-- Add Product picker modal -->
 <div class="modal-backdrop" id="add-product-modal">
-  <div class="modal">
+  <div class="modal" style="max-width:480px">
     <div class="modal-header">
       <h3>+ Add Product to Compare</h3>
       <button class="modal-close" onclick="closeAddProductPicker()">✕</button>
@@ -172,35 +172,81 @@ $industries = $pdo->query(
     <div class="modal-body">
       <div id="ap-error" class="site-alert site-alert-error" style="display:none"></div>
 
-      <div class="form-group">
-        <label class="form-label">Industry</label>
-        <select id="ap-industry" class="form-input" onchange="apOnIndustryChange()">
-          <option value="">Select Industry…</option>
-          <?php foreach($industries as $ind): ?>
-            <option value="<?= $ind['id'] ?>"><?= sH($ind['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
+      <!-- Tabs: pick how to browse -->
+      <div style="display:flex;gap:8px;margin-bottom:18px;border-bottom:1.5px solid var(--n200)">
+        <button type="button" id="ap-tab-btn-category" onclick="apSwitchTab('category')"
+                style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2.5px solid var(--brand);font-weight:700;font-size:13.5px;color:var(--brand);cursor:pointer">🔍 By Category</button>
+        <button type="button" id="ap-tab-btn-vendor" onclick="apSwitchTab('vendor')"
+                style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2.5px solid transparent;font-weight:700;font-size:13.5px;color:var(--n400);cursor:pointer">🏭 By Vendor / Mill</button>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Category</label>
-        <select id="ap-category" class="form-input" onchange="apOnCategoryChange()" disabled>
-          <option value="">Select Industry first…</option>
-        </select>
+      <!-- ── Tab 1: Category-first (industry → category → type → product) ── -->
+      <div id="ap-tab-category">
+        <div class="form-group">
+          <label class="form-label">Industry</label>
+          <select id="ap-industry" class="form-input" onchange="apOnIndustryChange()">
+            <option value="">Select Industry…</option>
+            <?php foreach($industries as $ind): ?>
+              <option value="<?= $ind['id'] ?>"><?= sH($ind['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select id="ap-category" class="form-input" onchange="apOnCategoryChange()" disabled>
+            <option value="">Select Industry first…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Product Type</label>
+          <select id="ap-type" class="form-input" onchange="apOnTypeChange()" disabled>
+            <option value="">Select Category first…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Product</label>
+          <select id="ap-product" class="form-input" disabled>
+            <option value="">Select Product Type first…</option>
+          </select>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Product Type</label>
-        <select id="ap-type" class="form-input" onchange="apOnTypeChange()" disabled>
-          <option value="">Select Category first…</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Product</label>
-        <select id="ap-product" class="form-input" disabled>
-          <option value="">Select Product Type first…</option>
-        </select>
+      <!-- ── Tab 2: Vendor-first (vendor/mill → industry → category → type → product) ── -->
+      <div id="ap-tab-vendor" style="display:none">
+        <div class="form-group" style="position:relative">
+          <label class="form-label">Vendor / Mill</label>
+          <input type="text" id="av-vendor-search" class="form-input" placeholder="Type a company or mill name…" autocomplete="off" oninput="avSearchVendors(this.value)" onfocus="avSearchVendors(this.value)">
+          <input type="hidden" id="av-vendor-id">
+          <div id="av-vendor-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1.5px solid var(--n200);border-radius:var(--r-sm);box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;margin-top:4px"></div>
+          <div id="av-vendor-chip" style="display:none;margin-top:8px;align-items:center;gap:8px;background:var(--n50);border-radius:100px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--brand)">
+            <span id="av-vendor-chip-name"></span>
+            <button type="button" onclick="avClearVendor()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--n400);font-size:13px">✕ change</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Industry</label>
+          <select id="av-industry" class="form-input" onchange="avOnIndustryChange()" disabled>
+            <option value="">Select Vendor first…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select id="av-category" class="form-input" onchange="avOnCategoryChange()" disabled>
+            <option value="">Select Industry first…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Product Type</label>
+          <select id="av-type" class="form-input" onchange="avOnTypeChange()" disabled>
+            <option value="">Select Category first…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Product</label>
+          <select id="av-product" class="form-input" disabled>
+            <option value="">Select Product Type first…</option>
+          </select>
+        </div>
       </div>
 
       <button type="button" class="btn btn-accent btn-full btn-lg" id="ap-add-btn" onclick="apAddSelectedProduct()" disabled>Add to Compare</button>
@@ -260,10 +306,17 @@ function submitEnquiry(e){e.preventDefault();const btn=document.getElementById('
 
 // ── Add Product picker: industry → category → product type → product ──
 function openAddProductPicker(){
+  apSwitchTab('category');
   document.getElementById('ap-industry').value = '';
   apResetSelect('ap-category', 'Select Industry first…');
   apResetSelect('ap-type', 'Select Category first…');
   apResetSelect('ap-product', 'Select Product Type first…');
+  avClearVendor();
+  document.getElementById('av-vendor-search').value = '';
+  apResetSelect('av-industry', 'Select Vendor first…');
+  apResetSelect('av-category', 'Select Industry first…');
+  apResetSelect('av-type', 'Select Category first…');
+  apResetSelect('av-product', 'Select Product Type first…');
   document.getElementById('ap-add-btn').disabled = true;
   apShowError('');
   document.getElementById('add-product-modal').classList.add('open');
@@ -350,6 +403,170 @@ function apOnTypeChange(){
     .catch(() => apShowError('Could not load products. Please try again.'));
 }
 
+// ── Tab switching between the two "Add Product" flows ──
+let apActiveTab = 'category';
+function apSwitchTab(tab){
+  apActiveTab = tab;
+  const isCategory = tab === 'category';
+  document.getElementById('ap-tab-category').style.display = isCategory ? 'block' : 'none';
+  document.getElementById('ap-tab-vendor').style.display   = isCategory ? 'none' : 'block';
+  const catBtn = document.getElementById('ap-tab-btn-category');
+  const venBtn = document.getElementById('ap-tab-btn-vendor');
+  catBtn.style.borderBottomColor = isCategory ? 'var(--brand)' : 'transparent';
+  catBtn.style.color = isCategory ? 'var(--brand)' : 'var(--n400)';
+  venBtn.style.borderBottomColor = isCategory ? 'transparent' : 'var(--brand)';
+  venBtn.style.color = isCategory ? 'var(--n400)' : 'var(--brand)';
+  apShowError('');
+  apRefreshAddBtn();
+}
+function apRefreshAddBtn(){
+  const productId = apActiveTab === 'category'
+    ? document.getElementById('ap-product').value
+    : document.getElementById('av-product').value;
+  document.getElementById('ap-add-btn').disabled = !productId;
+}
+
+// ── Vendor-first flow: searchable vendor picker ──
+let avSearchTimer = null;
+function avSearchVendors(q){
+  clearTimeout(avSearchTimer);
+  const results = document.getElementById('av-vendor-results');
+  if (!q || !q.trim()) { results.style.display = 'none'; results.innerHTML = ''; return; }
+  avSearchTimer = setTimeout(() => {
+    fetch(BASE + '/public/ajax/get-vendors-with-products.php?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(list => {
+        if (!list.length) {
+          results.innerHTML = '<div style="padding:12px 14px;font-size:13px;color:var(--n400)">No vendors found</div>';
+          results.style.display = 'block';
+          return;
+        }
+        results.innerHTML = list.map(v => {
+          const label = v.company || v.name;
+          const sub = v.company && v.name !== v.company ? v.name : '';
+          return `<div class="av-vendor-item" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--n100)"
+                       onmousedown="avSelectVendor(${v.id}, ${JSON.stringify(label).replace(/"/g,'&quot;')})">
+                    <div style="font-weight:600;font-size:13.5px;color:var(--n900)">${apEsc(label)}</div>
+                    ${sub ? `<div style="font-size:11.5px;color:var(--n500)">${apEsc(sub)}</div>` : ''}
+                    <div style="font-size:11px;color:var(--n400);margin-top:2px">${v.product_count} product${v.product_count==1?'':'s'}</div>
+                  </div>`;
+        }).join('');
+        results.style.display = 'block';
+      })
+      .catch(() => { results.style.display = 'none'; });
+  }, 250);
+}
+function avSelectVendor(id, label){
+  document.getElementById('av-vendor-id').value = id;
+  document.getElementById('av-vendor-search').style.display = 'none';
+  document.getElementById('av-vendor-results').style.display = 'none';
+  document.getElementById('av-vendor-results').innerHTML = '';
+  document.getElementById('av-vendor-chip-name').textContent = label;
+  document.getElementById('av-vendor-chip').style.display = 'flex';
+  avOnVendorChange();
+}
+function avClearVendor(){
+  document.getElementById('av-vendor-id').value = '';
+  document.getElementById('av-vendor-search').style.display = 'block';
+  document.getElementById('av-vendor-chip').style.display = 'none';
+  apResetSelect('av-industry', 'Select Vendor first…');
+  apResetSelect('av-category', 'Select Industry first…');
+  apResetSelect('av-type', 'Select Category first…');
+  apResetSelect('av-product', 'Select Product Type first…');
+  apRefreshAddBtn();
+}
+document.addEventListener('click', function(e){
+  if (!e.target.closest('#av-vendor-search') && !e.target.closest('#av-vendor-results')) {
+    document.getElementById('av-vendor-results').style.display = 'none';
+  }
+});
+
+function avOnVendorChange(){
+  apShowError('');
+  apResetSelect('av-category', 'Select Industry first…');
+  apResetSelect('av-type', 'Select Category first…');
+  apResetSelect('av-product', 'Select Product Type first…');
+  apRefreshAddBtn();
+
+  const vendorId = document.getElementById('av-vendor-id').value;
+  if (!vendorId) return;
+
+  fetch(BASE + '/public/ajax/get-industries-by-vendor.php?vendor_id=' + vendorId)
+    .then(r => r.json())
+    .then(list => {
+      const sel = document.getElementById('av-industry');
+      if (!list.length) { sel.innerHTML = '<option value="">No industries available</option>'; return; }
+      sel.innerHTML = '<option value="">Select Industry…</option>' +
+        list.map(i => `<option value="${i.id}">${apEsc(i.name)}</option>`).join('');
+      sel.disabled = false;
+    })
+    .catch(() => apShowError('Could not load industries. Please try again.'));
+}
+
+function avOnIndustryChange(){
+  apShowError('');
+  apResetSelect('av-type', 'Select Category first…');
+  apResetSelect('av-product', 'Select Product Type first…');
+  apRefreshAddBtn();
+
+  const industryId = document.getElementById('av-industry').value;
+  const vendorId = document.getElementById('av-vendor-id').value;
+  if (!industryId) return;
+
+  fetch(BASE + '/public/ajax/get-categories-with-products.php?industry_id=' + industryId + '&vendor_id=' + vendorId)
+    .then(r => r.json())
+    .then(list => {
+      const sel = document.getElementById('av-category');
+      if (!list.length) { sel.innerHTML = '<option value="">No categories available</option>'; return; }
+      sel.innerHTML = '<option value="">Select Category…</option>' +
+        list.map(c => `<option value="${c.id}">${apEsc(c.name)}</option>`).join('');
+      sel.disabled = false;
+    })
+    .catch(() => apShowError('Could not load categories. Please try again.'));
+}
+
+function avOnCategoryChange(){
+  apShowError('');
+  apResetSelect('av-product', 'Select Product Type first…');
+  apRefreshAddBtn();
+
+  const categoryId = document.getElementById('av-category').value;
+  const vendorId = document.getElementById('av-vendor-id').value;
+  if (!categoryId) return;
+
+  fetch(BASE + '/public/ajax/get-product-types-with-products.php?category_id=' + categoryId + '&vendor_id=' + vendorId)
+    .then(r => r.json())
+    .then(list => {
+      const sel = document.getElementById('av-type');
+      if (!list.length) { sel.innerHTML = '<option value="">No product types available</option>'; return; }
+      sel.innerHTML = '<option value="">Select Product Type…</option>' +
+        list.map(t => `<option value="${t.id}">${apEsc(t.name)}</option>`).join('');
+      sel.disabled = false;
+    })
+    .catch(() => apShowError('Could not load product types. Please try again.'));
+}
+
+function avOnTypeChange(){
+  apShowError('');
+  apRefreshAddBtn();
+
+  const typeId = document.getElementById('av-type').value;
+  const vendorId = document.getElementById('av-vendor-id').value;
+  if (!typeId) return;
+
+  fetch(BASE + '/public/ajax/get-products-by-type.php?product_type_id=' + typeId + '&vendor_id=' + vendorId)
+    .then(r => r.json())
+    .then(list => {
+      const sel = document.getElementById('av-product');
+      if (!list.length) { sel.innerHTML = '<option value="">All of this vendor\'s products of this type are already in your comparison</option>'; return; }
+      sel.innerHTML = '<option value="">Select Product…</option>' +
+        list.map(p => `<option value="${p.id}">${apEsc(p.name)}</option>`).join('');
+      sel.disabled = false;
+    })
+    .catch(() => apShowError('Could not load products. Please try again.'));
+}
+document.getElementById('av-product').addEventListener('change', apRefreshAddBtn);
+
 // Single persistent listener for the product dropdown, attached once at
 // page load rather than re-attached every time the list is repopulated.
 document.getElementById('ap-product').addEventListener('change', function(){
@@ -358,7 +575,9 @@ document.getElementById('ap-product').addEventListener('change', function(){
 
 function apAddSelectedProduct(){
   apShowError('');
-  const productId = document.getElementById('ap-product').value;
+  const productId = apActiveTab === 'category'
+    ? document.getElementById('ap-product').value
+    : document.getElementById('av-product').value;
   if (!productId) { apShowError('Please select a product first.'); return; }
 
   const btn = document.getElementById('ap-add-btn');

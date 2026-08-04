@@ -32,7 +32,7 @@ try {
            AND ba.end_date   >= CURDATE()
            AND CURTIME() BETWEEN s.start_time AND s.end_time
          ORDER BY ba.sort_order ASC, ba.id ASC
-         LIMIT 10"
+         LIMIT 20"  // safety cap only — real capacity is enforced per-slot at booking time
     )->fetchAll();
     // Increment impression counter for every ad shown this page load
     if ($heroBanners) {
@@ -50,7 +50,8 @@ if (empty($heroBanners)) {
                     NULL AS vendor_company, NULL AS slot_name
              FROM banners
              WHERE status = 'active'
-             ORDER BY sort_order ASC, id ASC"
+             ORDER BY sort_order ASC, id ASC
+             LIMIT 20"
         )->fetchAll();
     } catch (Exception $e) {
         $heroBanners = []; // banners table doesn't exist yet — plain hero shown
@@ -514,13 +515,12 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 /* Small phone (≤480px): narrowest cards so 2+ are always visible */
 @media(max-width:480px){
   .cat-card { width: 155px; min-height: 182px; }
-  .compare-group{
+}
+
+.compare-group{
   display:grid;
-  grid-template-columns: 1fr !important;
+  grid-template-columns: 1fr ;
 }
-}
-
-
 </style>
 
 <script>

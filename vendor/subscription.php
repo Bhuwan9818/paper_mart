@@ -10,7 +10,9 @@ $user = currentUser(); $uid = $user['id'];
 $sub  = getVendorSubscription($pdo, $uid);
 $usage = getVendorUsage($pdo, $uid);
 
-// Handle plan selection (demo - in production integrate Razorpay/Stripe)
+// Free-plan switch happens instantly (no payment needed). Paid plans are
+// handled by ajax/create-payment-order.php + ajax/verify-payment.php via
+// Razorpay Checkout — see the "Pay & Activate" button below.
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['plan_id'])) {
     verifyCsrf();
     $planId = (int)$_POST['plan_id'];
@@ -18,16 +20,16 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['plan_id'])) {
     $plan   = $pdo->prepare("SELECT * FROM subscription_plans WHERE id=? AND is_active=1"); $plan->execute([$planId]); $plan=$plan->fetch();
     if ($plan) {
         $price = $cycle==='yearly' ? $plan['price_yearly'] : $plan['price_monthly'];
+        if ($price > 0) {
+            flash('error', 'This plan requires payment — please use the "Pay & Activate" button.');
+            header('Location: subscription.php'); exit;
+        }
         // Cancel existing
         $pdo->prepare("UPDATE vendor_subscriptions SET status='cancelled' WHERE vendor_id=? AND status IN('active','trial')")->execute([$uid]);
         // Create new
         $expires = $cycle==='yearly' ? date('Y-m-d H:i:s',strtotime('+1 year')) : date('Y-m-d H:i:s',strtotime('+1 month'));
         $pdo->prepare("INSERT INTO vendor_subscriptions (vendor_id,plan_id,billing_cycle,status,started_at,expires_at) VALUES(?,?,?,'active',NOW(),?)")
             ->execute([$uid,$planId,$cycle,$expires]);
-        // Log payment (demo)
-        if ($price > 0) {
-            $pdo->prepare("INSERT INTO subscription_payments (vendor_id,plan_id,amount,billing_cycle,status,paid_at) VALUES(?,?,?,?,'paid',NOW())")->execute([$uid,$planId,$price,$cycle]);
-        }
         flash('success','Plan activated: '.$plan['name'].' ('.$cycle.')');
         header('Location: subscription.php'); exit;
     }
@@ -134,14 +136,21 @@ include __DIR__ . '/../includes/head.php';
         <?php endforeach; ?>
       </ul>
       <?php if (!$isCurrent): ?>
-      <form method="POST">
-        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-        <input type="hidden" name="plan_id" value="<?= $plan['id'] ?>">
-        <input type="hidden" name="billing_cycle" class="billing-input" value="monthly">
-        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;background:linear-gradient(135deg,<?= $color ?>,<?= $color ?>cc)">
-          <?= $plan['price_monthly']==0 ? 'Downgrade to Free' : 'Choose '.$plan['name'] ?>
-        </button>
-      </form>
+        <?php if ((float)$plan['price_monthly'] <= 0): ?>
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+          <input type="hidden" name="plan_id" value="<?= $plan['id'] ?>">
+          <input type="hidden" name="billing_cycle" class="billing-input" value="monthly">
+          <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;background:linear-gradient(135deg,<?= $color ?>,<?= $color ?>cc)">
+            Downgrade to Free
+          </button>
+        </form>
+        <?php else: ?>
+          <button type="button" class="btn btn-primary pay-plan-btn" data-plan-id="<?= $plan['id'] ?>" data-plan-name="<?= sanitize($plan['name']) ?>"
+                  style="width:100%;justify-content:center;background:linear-gradient(135deg,<?= $color ?>,<?= $color ?>cc)" onclick="payForPlan(this)">
+            Pay &amp; Activate <?= sanitize($plan['name']) ?>
+          </button>
+        <?php endif; ?>
       <?php else: ?>
         <button class="btn btn-outline" style="width:100%;justify-content:center;cursor:default" disabled>✓ Active Plan</button>
       <?php endif; ?>
@@ -172,6 +181,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <?php endif; ?>
 </div>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 let billing = 'monthly';
 function toggleBilling(b) {
@@ -189,5 +199,53 @@ function toggleBilling(b) {
 }
 document.getElementById('hamburger').addEventListener('click',()=>{document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-overlay').classList.add('show');});
 document.getElementById('sidebar-overlay').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('show');});
+
+function payForPlan(btn) {
+  const planId = btn.dataset.planId, planName = btn.dataset.planName;
+  const originalText = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Starting payment...';
+
+  fetch('<?=BASE_URL?>/ajax/create-payment-order.php', {
+    method: 'POST',
+    headers: {'Content-Type':'application/x-www-form-urlencoded'},
+    body: new URLSearchParams({csrf_token: '<?= csrfToken() ?>', purpose: 'subscription', plan_id: planId, billing_cycle: billing})
+  }).then(r=>r.json()).then(d=>{
+    if (!d.ok) { alert(d.msg || 'Could not start payment.'); btn.disabled=false; btn.textContent=originalText; return; }
+
+    const rzp = new Razorpay({
+      key: d.key_id,
+      amount: d.amount,
+      currency: d.currency,
+      order_id: d.order_id,
+      name: d.name,
+      description: d.description,
+      prefill: d.prefill,
+      theme: { color: '#8B241D' },
+      handler: function(response) {
+        btn.textContent = 'Verifying payment...';
+        fetch('<?=BASE_URL?>/ajax/verify-payment.php', {
+          method: 'POST',
+          headers: {'Content-Type':'application/x-www-form-urlencoded'},
+          body: new URLSearchParams({
+            csrf_token: '<?= csrfToken() ?>',
+            txn_id: d.txn_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature
+          })
+        }).then(r=>r.json()).then(v=>{
+          if (v.ok) { window.location.href = 'subscription.php'; }
+          else { alert(v.msg || 'Payment could not be verified. Please contact support if you were charged.'); btn.disabled=false; btn.textContent=originalText; }
+        }).catch(()=>{ alert('Network error while verifying payment.'); btn.disabled=false; btn.textContent=originalText; });
+      },
+      modal: {
+        ondismiss: function(){ btn.disabled=false; btn.textContent=originalText; }
+      }
+    });
+    rzp.on('payment.failed', function(){ alert('Payment failed. Please try again.'); btn.disabled=false; btn.textContent=originalText; });
+    rzp.open();
+    btn.textContent = originalText; btn.disabled = false;
+  }).catch(()=>{ alert('Network error. Please try again.'); btn.disabled=false; btn.textContent=originalText; });
+}
 </script>
 </div></div></body></html>

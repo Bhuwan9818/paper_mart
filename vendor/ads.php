@@ -39,7 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ov = $pdo->prepare("SELECT COUNT(*) FROM banner_ads WHERE slot_id=? AND status IN('approved','running','pending') AND start_date<=? AND end_date>=?");
                 $ov->execute([$slotId,$endDate,$startDate]);
                 if ($ov->fetchColumn() >= $sr['max_concurrent']) $errors[] = 'This slot is fully booked for your selected dates. Please try different dates or a different slot.';
-                elseif (!isHeroCapacityAvailable($pdo, $startDate, $endDate)) $errors[] = 'The homepage hero can only show '.MAX_ACTIVE_HERO_BANNERS.' active banners at a time, and that limit is already booked for these dates (across all slots). Please choose different dates.';
             }
         }
         if (!$errors) {
@@ -82,12 +81,13 @@ $myAds->execute([$uid]); $myAds=$myAds->fetchAll();
 $pageTitle='Banner Ads'; $activePage='ads';
 include __DIR__ . '/../includes/head.php';
 ?>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 /* Defined immediately after head.php (before any tab content) on purpose:
    these are the onclick handlers used by the booking form below. Keeping
    them this early means they're always available even if some later part
    of the page fails to render for any reason. */
-let selectedPkgId=null, selectedSlotId=null, heroCapacityFull=false, lastAvailData=null;
+let selectedPkgId=null, selectedSlotId=null, lastAvailData=null;
 
 function selectPackage(el){
   document.querySelectorAll('.pkg-select-card').forEach(c=>c.classList.remove('selected'));
@@ -126,21 +126,19 @@ function onDateChange(){
 
 // Pulls fresh availability for every slot for the exact chosen date range,
 // then greys out / disables (removes click handler from) any slot that's
-// already fully booked for those dates — plus disables ALL slots at once if
-// the global 4-banner hero cap is already booked for that period.
+// already fully booked for those dates. Each time slot is independent —
+// a full 6am-12pm slot never affects the 12pm-6pm or any other slot, since
+// they run at different times of day and never share screen time.
 function refreshSlotAvailability(){
   const startEl=document.getElementById('start-date');
   const pkgEl=document.querySelector('.pkg-select-card.selected');
-  const globalBanner=document.getElementById('global-full-banner');
-  if(!startEl||!globalBanner)return;
+  if(!startEl)return;
   if(!startEl.value||!pkgEl){ return; } // leave the "as of today" defaults showing
 
   fetch('<?=BASE_URL?>/public/ajax/slot-availability.php?start='+startEl.value+'&days='+pkgEl.dataset.days)
     .then(r=>r.json()).then(d=>{
       if(!d.ok)return;
       lastAvailData=d;
-      heroCapacityFull=!!d.globalFull;
-      globalBanner.style.display=heroCapacityFull?'block':'none';
 
       document.querySelectorAll('.slot-select-card').forEach(card=>{
         const sid=card.dataset.id;
@@ -149,7 +147,7 @@ function refreshSlotAvailability(){
         const bar=document.getElementById('slot-bar-'+sid);
         const label=document.getElementById('slot-label-'+sid);
         const asof=document.getElementById('slot-asof-'+sid);
-        const isFull=info.full||heroCapacityFull; // full if slot itself is full OR global hero cap is full
+        const isFull=info.full;
         const pct=info.max>0?Math.min(100,Math.round(info.used/info.max*100)):0;
 
         card.classList.toggle('full',isFull);
@@ -157,9 +155,7 @@ function refreshSlotAvailability(){
         if(isFull) card.classList.remove('selected');
         if(bar){ bar.style.width=pct+'%'; bar.style.background=isFull?'linear-gradient(90deg,#dc2626,#f87171)':''; }
         if(label){
-          if(heroCapacityFull && !info.full){
-            label.style.color='#dc2626'; label.textContent='FULL (hero limit reached)';
-          } else if(isFull){
+          if(isFull){
             label.style.color='#dc2626'; label.textContent='FULL';
           } else {
             label.style.color='var(--success)'; label.textContent='✓ '+info.free+' slot'+(info.free>1?'s':'')+' available';
@@ -171,7 +167,7 @@ function refreshSlotAvailability(){
       // If the slot the vendor had selected just became full for these dates, clear it
       if(selectedSlotId){
         const info=d.slots[selectedSlotId];
-        if(!info || info.full || heroCapacityFull){
+        if(!info || info.full){
           selectedSlotId=null;
           const slotIdField=document.getElementById('f-slot-id');
           if(slotIdField) slotIdField.value='';
@@ -188,15 +184,12 @@ function updateNoticeFromCache(){
   const info=lastAvailData.slots[selectedSlotId];
   if(!info){n.style.display='none';return;}
   n.style.display='block';
-  if(heroCapacityFull){
-    n.style.background='#fee2e2';n.style.color='#dc2626';
-    n.textContent='❌ The homepage hero already has '+lastAvailData.globalMax+' active banners booked for these dates (across all slots). Please choose different dates.';
-  } else if(info.free>0){
+  if(info.free>0){
     n.style.background='#dcfce7';n.style.color='#16a34a';
-    n.textContent='✅ '+info.free+' slot'+(info.free>1?'s':'')+' available · '+lastAvailData.globalUsed+'/'+lastAvailData.globalMax+' hero banners booked for these dates.';
+    n.textContent='✅ '+info.free+' slot'+(info.free>1?'s':'')+' available in this time window for your dates.';
   } else {
     n.style.background='#fee2e2';n.style.color='#dc2626';
-    n.textContent='❌ This slot is fully booked for your dates. Please try different dates or another slot.';
+    n.textContent='❌ This time slot is fully booked for your dates. Please try different dates or another time slot.';
   }
 }
 
@@ -221,7 +214,6 @@ function validateBooking(){
   const pkgErr=document.getElementById('pkg-err'), slotErr=document.getElementById('slot-err');
   if(!selectedPkgId){if(pkgErr)pkgErr.style.display='block';ok=false;const s=document.querySelector('.step-section');if(s)s.scrollIntoView({behavior:'smooth'});}
   if(!selectedSlotId){if(slotErr){slotErr.style.display='block';if(ok)slotErr.scrollIntoView({behavior:'smooth'});}ok=false;}
-  if(ok&&heroCapacityFull){alert('The homepage hero already has the maximum number of active banners booked for these dates. Please choose different dates.');ok=false;}
   return ok;
 }
 
@@ -230,6 +222,46 @@ function openPayRefModal(adId,payId,price,pkgName){
   document.getElementById('pr-ref').value='';
   document.getElementById('pr-info').innerHTML='<strong>'+pkgName+'</strong> &middot; ₹'+parseFloat(price).toFixed(0);
   document.getElementById('payref-modal').classList.add('open');
+}
+
+function payForAd(btn){
+  const adId=btn.dataset.adId;
+  const originalText=btn.textContent;
+  btn.disabled=true; btn.textContent='Starting payment...';
+
+  fetch('<?=BASE_URL?>/ajax/create-payment-order.php', {
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({csrf_token:'<?=csrfToken()?>', purpose:'ad', ad_id:adId})
+  }).then(r=>r.json()).then(d=>{
+    if(!d.ok){ alert(d.msg||'Could not start payment.'); btn.disabled=false; btn.textContent=originalText; return; }
+
+    const rzp=new Razorpay({
+      key:d.key_id, amount:d.amount, currency:d.currency, order_id:d.order_id,
+      name:d.name, description:d.description, prefill:d.prefill,
+      theme:{color:'#8B241D'},
+      handler:function(response){
+        btn.textContent='Verifying payment...';
+        fetch('<?=BASE_URL?>/ajax/verify-payment.php', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body:new URLSearchParams({
+            csrf_token:'<?=csrfToken()?>', txn_id:d.txn_id,
+            razorpay_order_id:response.razorpay_order_id,
+            razorpay_payment_id:response.razorpay_payment_id,
+            razorpay_signature:response.razorpay_signature
+          })
+        }).then(r=>r.json()).then(v=>{
+          if(v.ok){ window.location.href='ads.php?tab=my-ads'; }
+          else { alert(v.msg||'Payment could not be verified. Please contact support if you were charged.'); btn.disabled=false; btn.textContent=originalText; }
+        }).catch(()=>{ alert('Network error while verifying payment.'); btn.disabled=false; btn.textContent=originalText; });
+      },
+      modal:{ ondismiss:function(){ btn.disabled=false; btn.textContent=originalText; } }
+    });
+    rzp.on('payment.failed', function(){ alert('Payment failed. Please try again.'); btn.disabled=false; btn.textContent=originalText; });
+    rzp.open();
+    btn.textContent=originalText; btn.disabled=false;
+  }).catch(()=>{ alert('Network error. Please try again.'); btn.disabled=false; btn.textContent=originalText; });
 }
 </script>
 
@@ -374,7 +406,8 @@ function openPayRefModal(adId,payId,price,pkgName){
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;min-width:90px">
           <?php if (($ad['pay_status']??'pending')==='pending'): ?>
-          <button class="btn btn-primary btn-sm" onclick="openPayRefModal(<?=$ad['id']?>,<?=$ad['pay_id']?:0?>,<?=$ad['package_price']?>,'<?=addslashes($ad['package_name'])?>')">💳 Pay Ref</button>
+          <button class="btn btn-primary btn-sm" data-ad-id="<?=$ad['id']?>" onclick="payForAd(this)">💳 Pay Online</button>
+          <button class="btn btn-outline btn-xs" onclick="openPayRefModal(<?=$ad['id']?>,<?=$ad['pay_id']?:0?>,<?=$ad['package_price']?>,'<?=addslashes($ad['package_name'])?>')">Bank Transfer Instead</button>
           <?php endif; ?>
           <?php if(in_array($sc,['pending','approved'])): ?>
           <form method="POST" onsubmit="return confirm('Cancel this booking?')">
@@ -439,7 +472,6 @@ function openPayRefModal(adId,payId,price,pkgName){
         <!-- Step 3: Time Slot -->
         <div class="step-section">
           <div class="step-header"><div class="step-num">3</div><div class="step-title">Select a Time Slot</div></div>
-          <div id="global-full-banner" style="display:none;font-size:12.5px;font-weight:600;color:#dc2626;background:#fee2e2;border-radius:8px;padding:10px 12px;margin-bottom:10px">❌ The homepage hero already has <?= MAX_ACTIVE_HERO_BANNERS ?> active banners booked for these dates (across all slots). Every slot is disabled — please choose different dates.</div>
           <div id="slot-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
             <?php foreach($slots as $s):
               $today=date('Y-m-d');
@@ -523,23 +555,6 @@ function openPayRefModal(adId,payId,price,pkgName){
         </div>
       </div>
 
-      <?php
-        $todayG = date('Y-m-d');
-        $globalUsedToday = getGlobalActiveBannerCount($pdo, $todayG, $todayG);
-        $globalFreeToday = max(0, MAX_ACTIVE_HERO_BANNERS - $globalUsedToday);
-        $globalFullToday = $globalFreeToday <= 0;
-      ?>
-      <div class="info-card">
-        <div class="info-card-header">🎯 Hero Banner Capacity Today</div>
-        <div class="info-card-body">
-          <div class="slot-avail-row">
-            <div><div style="font-size:13px;font-weight:600">All Slots Combined</div><div style="font-size:11px;color:var(--text-muted)">Max <?= MAX_ACTIVE_HERO_BANNERS ?> banners shown at once</div></div>
-            <div style="text-align:right"><div style="font-size:12px;font-weight:700;color:<?=$globalFullToday?'#dc2626':'#16a34a'?>"><?=$globalFullToday?'FULL':$globalFreeToday.' free'?></div><div style="font-size:10px;color:var(--text-muted)"><?=$globalUsedToday?>/<?=MAX_ACTIVE_HERO_BANNERS?></div></div>
-          </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">This is checked across every time slot combined. Even if your chosen slot has room, booking is blocked once <?=MAX_ACTIVE_HERO_BANNERS?> banners are already active for those dates.</div>
-        </div>
-      </div>
-
       <div class="info-card">
         <div class="info-card-header">⏰ Slot Availability Today</div>
         <div class="info-card-body">
@@ -554,6 +569,7 @@ function openPayRefModal(adId,payId,price,pkgName){
             <div style="text-align:right"><div style="font-size:12px;font-weight:700;color:<?=$isFull?'#dc2626':'#16a34a'?>"><?=$isFull?'FULL':$free.' free'?></div><div style="font-size:10px;color:var(--text-muted)"><?=$used?>/<?=$s['max_concurrent']?></div></div>
           </div>
           <?php endforeach; ?>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">Each time slot has its own limit — they run at different times of day, so booking out one slot never affects the others.</div>
         </div>
       </div>
 

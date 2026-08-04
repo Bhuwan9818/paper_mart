@@ -55,6 +55,13 @@ try {
     $payments=[]; $total=0; $totalRevenue=$monthRevenue=$pendingAmt=$paidCount=0; $plans=[]; $months=[];
 }
 
+// Recent Razorpay gateway transactions (subscription + ad payments), for reconciliation.
+try {
+    $gatewayTxns = $pdo->query("SELECT pt.*, u.name AS vendor_name, u.company FROM payment_transactions pt JOIN users u ON u.id=pt.vendor_id ORDER BY pt.created_at DESC LIMIT 15")->fetchAll();
+} catch (Exception $e) {
+    $gatewayTxns = []; // table not migrated yet — page still works, just skips this section
+}
+
 $pageTitle='Payments'; $activePage='payments';
 include __DIR__ . '/../includes/head.php';
 ?>
@@ -69,6 +76,30 @@ include __DIR__ . '/../includes/head.php';
   </div>
 </div>
 <div class="content">
+  <?php if ($gatewayTxns): ?>
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header"><h2>💳 Recent Razorpay Transactions</h2><span style="margin-left:auto;font-size:12px;color:var(--text-muted)">Live gateway activity — auto-verified, no manual approval needed</span></div>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Vendor</th><th>Purpose</th><th>Amount</th><th>Gateway Order ID</th><th>Gateway Payment ID</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+        <?php foreach ($gatewayTxns as $t): ?>
+        <tr>
+          <td><?= sanitize($t['vendor_name']) ?><div style="font-size:11.5px;color:var(--text-muted)"><?= sanitize($t['company'] ?: '') ?></div></td>
+          <td><?= ucfirst($t['purpose']) ?></td>
+          <td>₹<?= number_format($t['amount'],0) ?></td>
+          <td><code style="font-size:11px"><?= sanitize($t['gateway_order_id']) ?></code></td>
+          <td><code style="font-size:11px"><?= sanitize($t['gateway_payment_id'] ?: '—') ?></code></td>
+          <td><?= statusBadge($t['status']==='paid'?'active':($t['status']==='failed'?'closed':'pending')) ?></td>
+          <td style="font-size:12px;color:var(--text-muted)"><?= timeAgo($t['created_at']) ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <?php endif; ?>
+
   <?= showFlash() ?>
   <div class="page-header"><h1>💰 Payment Management</h1></div>
 

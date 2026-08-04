@@ -8,24 +8,35 @@
 // admin/ads.php, public/index.php, public/ajax/*.php) to work. Defined here
 // with guards so this file alone always makes them available, even if
 // config.php on a given server doesn't (yet) define the constant.
+//
+// IMPORTANT — capacity is scoped PER TIME SLOT, not across the whole day.
+// Each ad_slot is a distinct time-of-day window (e.g. 12am–6am, 6am–12pm,
+// 12pm–6pm, 6pm–12am) and only ONE slot's banners are ever on screen at a
+// given real-world moment. So "4 active banners at once" means 4 within
+// whichever slot a booking falls into — booking out slot A must NEVER block
+// slot B, since they never compete for the same screen time.
 if (!defined('MAX_ACTIVE_HERO_BANNERS')) {
-    define('MAX_ACTIVE_HERO_BANNERS', 4); // max banners shown at once in the homepage hero
+    define('MAX_ACTIVE_HERO_BANNERS', 4); // default per-slot cap, used as a fallback if a slot has no max_concurrent set
 }
-if (!function_exists('getGlobalActiveBannerCount')) {
-    function getGlobalActiveBannerCount($pdo, $startDate, $endDate, $excludeAdId = null) {
+
+// Counts active bookings WITHIN A SPECIFIC SLOT that overlap the given date range.
+if (!function_exists('getSlotActiveBannerCount')) {
+    function getSlotActiveBannerCount($pdo, $slotId, $startDate, $endDate, $excludeAdId = null) {
         $sql = "SELECT COUNT(*) FROM banner_ads
-                WHERE status IN ('pending','approved','running')
+                WHERE slot_id = ?
+                  AND status IN ('pending','approved','running')
                   AND start_date <= ? AND end_date >= ?";
-        $params = [$endDate, $startDate];
+        $params = [$slotId, $endDate, $startDate];
         if ($excludeAdId) { $sql .= " AND id != ?"; $params[] = $excludeAdId; }
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         return (int)$stmt->fetchColumn();
     }
 }
-if (!function_exists('isHeroCapacityAvailable')) {
-    function isHeroCapacityAvailable($pdo, $startDate, $endDate, $excludeAdId = null) {
-        return getGlobalActiveBannerCount($pdo, $startDate, $endDate, $excludeAdId) < MAX_ACTIVE_HERO_BANNERS;
+if (!function_exists('isSlotCapacityAvailable')) {
+    function isSlotCapacityAvailable($pdo, $slotId, $maxConcurrent, $startDate, $endDate, $excludeAdId = null) {
+        $max = $maxConcurrent > 0 ? $maxConcurrent : MAX_ACTIVE_HERO_BANNERS;
+        return getSlotActiveBannerCount($pdo, $slotId, $startDate, $endDate, $excludeAdId) < $max;
     }
 }
 
@@ -98,6 +109,8 @@ function statusBadge($status) {
         'inactive'    => 'badge-secondary',
         'pending'     => 'badge-warning',
         'open'        => 'badge-info',
+        'new'         => 'badge-info',
+        'contacted'   => 'badge-warning',
         'in_progress' => 'badge-warning',
         'closed'      => 'badge-secondary',
     ];

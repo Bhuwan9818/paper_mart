@@ -1,9 +1,9 @@
 <?php
 // public/ajax/slot-availability.php
 // Returns, for a proposed start date + duration, the booking status of every
-// active ad slot (used/max/free/full) PLUS the global cross-slot hero-banner
-// capacity (max MAX_ACTIVE_HERO_BANNERS shown at once). Used by the vendor
-// booking form to disable slots that are already fully booked for those dates.
+// active ad slot (used/max/free/full). Each slot is checked independently —
+// slots are distinct, non-overlapping times of day (e.g. 6am-12pm, 12pm-6pm),
+// so a full slot never affects availability in any other slot.
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once dirname(__DIR__, 2) . '/config.php';
@@ -22,17 +22,9 @@ $end = date('Y-m-d', strtotime($start . ' +' . ($days - 1) . ' days'));
 
 $slots = $pdo->query("SELECT id, max_concurrent FROM ad_slots WHERE is_active=1")->fetchAll();
 
-$stmt = $pdo->prepare(
-    "SELECT COUNT(*) FROM banner_ads
-     WHERE slot_id = ?
-       AND status IN ('pending','approved','running')
-       AND start_date <= ? AND end_date >= ?"
-);
-
 $slotResult = [];
 foreach ($slots as $s) {
-    $stmt->execute([$s['id'], $end, $start]);
-    $used = (int)$stmt->fetchColumn();
+    $used = getSlotActiveBannerCount($pdo, $s['id'], $start, $end);
     $slotResult[$s['id']] = [
         'used' => $used,
         'max'  => (int)$s['max_concurrent'],
@@ -41,14 +33,10 @@ foreach ($slots as $s) {
     ];
 }
 
-$globalUsed = getGlobalActiveBannerCount($pdo, $start, $end);
-
 echo json_encode([
-    'ok'         => true,
-    'start'      => $start,
-    'end'        => $end,
-    'slots'      => $slotResult,
-    'globalUsed' => $globalUsed,
-    'globalMax'  => MAX_ACTIVE_HERO_BANNERS,
-    'globalFull' => $globalUsed >= MAX_ACTIVE_HERO_BANNERS,
+    'ok'    => true,
+    'start' => $start,
+    'end'   => $end,
+    'slots' => $slotResult,
 ]);
+
