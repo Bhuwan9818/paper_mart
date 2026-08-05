@@ -84,7 +84,8 @@ $industries = $pdo->query(
               ?>
               <?php if($img): ?><img src="<?= sH($img) ?>" class="compare-img"><?php else: ?><div style="height:160px;background:var(--n50);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:48px;margin-bottom:10px">📦</div><?php endif; ?>
               <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" style="font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:var(--n900);display:block;margin-bottom:5px"><?= sH($p['name']) ?></a>
-              <div style="font-size:12px;color:var(--n500);margin-bottom:8px"><?= sH($p['cname']) ?></div>
+              <div style="font-size:12px;color:var(--n500);margin-bottom:4px"><?= sH($p['cname']) ?></div>
+              <div style="font-size:12.5px;font-weight:600;color:var(--brand);margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:4px">🏭 <?= sH($p['company'] ?: $p['vname']) ?><?php if($p['is_verified']): ?><span title="Verified Vendor" style="color:var(--success,#16a34a)">✓</span><?php endif; ?></div>
               <button class="btn btn-accent btn-sm btn-full" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">📩 Enquire</button>
               <button class="btn btn-outline btn-sm btn-full" style="margin-top:6px" onclick="removeFromComparePage(<?= $p['id'] ?>)">Remove</button>
             </th>
