@@ -8,6 +8,7 @@ $q          = trim($_GET['q'] ?? '');
 $industryId = (int)($_GET['industry'] ?? 0);
 $categoryId = (int)($_GET['category'] ?? 0);
 $typeId     = (int)($_GET['type'] ?? 0);
+$vendorId   = (int)($_GET['vendor'] ?? 0);
 $sort       = $_GET['sort'] ?? 'newest';
 $view       = $_GET['view'] ?? 'grid';
 $page       = max(1,(int)($_GET['page'] ?? 1));
@@ -16,10 +17,22 @@ $offset     = ($page-1)*$perPage;
 
 // Build WHERE
 $where = "WHERE p.status='active'"; $params = [];
-if ($q)          { $where .= " AND (p.name LIKE ? OR p.description LIKE ? OR p.tags LIKE ?)"; $params=array_merge($params,["%$q%","%$q%","%$q%"]); }
+if ($q) {
+    // Matches product name/description/tags, PLUS attribute specs like "20 BF" or
+    // "100 GSM" — typed as "20bf"/"100gsm" (no space) or with a space, either way.
+    // Attribute value+unit are concatenated and normalized (lowercased, spaces
+    // stripped) so "20 BF", "20BF", and "20 bf" all match the same search.
+    $qNorm = strtolower(str_replace(' ', '', $q));
+    $where .= " AND (p.name LIKE ? OR p.description LIKE ? OR p.tags LIKE ? OR EXISTS (
+                    SELECT 1 FROM product_attributes pa WHERE pa.product_id = p.id
+                    AND REPLACE(LOWER(CONCAT(pa.attribute_value, pa.attribute_unit)), ' ', '') LIKE ?
+                ))";
+    $params = array_merge($params, ["%$q%","%$q%","%$q%","%$qNorm%"]);
+}
 if ($industryId) { $where .= " AND p.industry_id=?";      $params[]=$industryId; }
 if ($categoryId) { $where .= " AND p.category_id=?";      $params[]=$categoryId; }
 if ($typeId)     { $where .= " AND p.product_type_id=?";  $params[]=$typeId; }
+if ($vendorId)   { $where .= " AND p.vendor_id=?";         $params[]=$vendorId; }
 
 $orderBy = match($sort){
   'price_asc'  => "p.price_range ASC",
@@ -51,6 +64,9 @@ $heading = 'All Products';
 if ($q)          $heading = "Results for \"".sH($q)."\"";
 elseif($categoryId){ $cn=$pdo->query("SELECT name FROM categories WHERE id=$categoryId")->fetchColumn(); $heading=sH($cn??'Category'); }
 elseif($industryId){ $in=$pdo->query("SELECT name FROM industries WHERE id=$industryId")->fetchColumn(); $heading=sH($in??'Industry'); }
+elseif($vendorId){ $vn=$pdo->prepare("SELECT COALESCE(company,name) FROM users WHERE id=?"); $vn->execute([$vendorId]); $vnName=$vn->fetchColumn(); $heading=sH($vnName??'Vendor'); }
+$selectedVendorName = null;
+if ($vendorId) { $sv=$pdo->prepare("SELECT COALESCE(company,name) FROM users WHERE id=?"); $sv->execute([$vendorId]); $selectedVendorName = $sv->fetchColumn(); }
 $pageTitle = "$heading — PaperMart";
 ?>
 
@@ -103,6 +119,22 @@ $pageTitle = "$heading — PaperMart";
           <?php endforeach; ?>
         </div>
         <?php endif; ?>
+
+        <div class="filter-card" style="position:relative">
+          <div class="filter-title">
+            🏭 Mills / Vendors
+            <?php if($vendorId): ?><button class="filter-clear" onclick="applyFilter('vendor',0)">Clear</button><?php endif; ?>
+          </div>
+          <?php if ($vendorId && $selectedVendorName): ?>
+            <div style="display:flex;align-items:center;gap:8px;background:var(--n50);border-radius:100px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--brand);margin-bottom:8px">
+              <span><?= sH($selectedVendorName) ?></span>
+              <button type="button" onclick="applyFilter('vendor',0)" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--n400);font-size:13px">✕</button>
+            </div>
+          <?php else: ?>
+            <input type="text" id="vendor-filter-search" class="form-input" placeholder="Type a mill/vendor name…" autocomplete="off" oninput="vfSearch(this.value)" onfocus="vfSearch(this.value)" style="font-size:13px;padding:8px 12px">
+            <div id="vendor-filter-results" style="display:none;position:absolute;left:16px;right:16px;z-index:20;background:#fff;border:1.5px solid var(--n200);border-radius:var(--r-sm);box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:240px;overflow-y:auto;margin-top:4px"></div>
+          <?php endif; ?>
+        </div>
 
         <div class="filter-card">
           <div class="filter-title">⚡ Quick Filters</div>
@@ -263,6 +295,41 @@ include __DIR__.'/includes/footer.php';
 </div>
 
 <script>
+let vfTimer = null;
+function vfSearch(q) {
+  clearTimeout(vfTimer);
+  const results = document.getElementById('vendor-filter-results');
+  if (!results) return;
+  if (!q || !q.trim()) { results.style.display = 'none'; results.innerHTML = ''; return; }
+  vfTimer = setTimeout(() => {
+    fetch(BASE + '/public/ajax/get-vendors-with-products.php?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(list => {
+        if (!list.length) {
+          results.innerHTML = '<div style="padding:10px 12px;font-size:12.5px;color:var(--n400)">No mills found</div>';
+          results.style.display = 'block';
+          return;
+        }
+        results.innerHTML = list.map(v => {
+          const label = v.company || v.name;
+          return `<div style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--n100);font-size:13px"
+                       onmousedown="applyFilter('vendor',${v.id})">
+                    <div style="font-weight:600;color:var(--n900)">${label.replace(/</g,'&lt;')}</div>
+                    <div style="font-size:11px;color:var(--n400)">${v.product_count} product${v.product_count==1?'':'s'}</div>
+                  </div>`;
+        }).join('');
+        results.style.display = 'block';
+      })
+      .catch(() => { results.style.display = 'none'; });
+  }, 250);
+}
+document.addEventListener('click', function(e){
+  const box = document.getElementById('vendor-filter-results');
+  if (box && !e.target.closest('#vendor-filter-search') && !e.target.closest('#vendor-filter-results')) {
+    box.style.display = 'none';
+  }
+});
+
 function applyFilter(key, val) {
   const p = new URLSearchParams(window.location.search);
   if(val) p.set(key,val); else p.delete(key);
