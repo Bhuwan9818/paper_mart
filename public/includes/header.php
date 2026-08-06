@@ -222,10 +222,11 @@ $searchQ    = sH($_GET['q'] ?? '');
 
       <!-- Search bar (desktop) -->
       <div class="search-bar">
-        <form action="<?= BASE_URL ?>/public/products.php" method="GET">
-          <input type="text" name="q" value="<?= $searchQ ?>" placeholder="Search kraft paper, corrugated boxes, duplex board…" autocomplete="off">
+        <form action="<?= BASE_URL ?>/public/products.php" method="GET" autocomplete="off">
+          <input type="text" name="q" id="site-search-input" value="<?= $searchQ ?>" placeholder="Search kraft paper, corrugated boxes, 20 BF, mill name…" autocomplete="off">
           <button type="submit">🔍</button>
         </form>
+        <div id="site-search-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:200;background:#fff;border:1.5px solid var(--n200);border-radius:var(--r);box-shadow:0 12px 32px rgba(0,0,0,.14);max-height:420px;overflow-y:auto;margin-top:6px"></div>
       </div>
 
       <!-- Desktop actions -->
@@ -260,11 +261,12 @@ $searchQ    = sH($_GET['q'] ?? '');
   <!-- Mobile search bar (collapses in/out) -->
   <div class="mob-search-bar" id="mob-search-bar">
     <div class="container">
-      <form action="<?= BASE_URL ?>/public/products.php" method="GET">
-        <div class="mob-search-inner">
-          <input type="text" name="q" value="<?= $searchQ ?>" placeholder="Search products…" autocomplete="off" id="mob-search-input">
+      <form action="<?= BASE_URL ?>/public/products.php" method="GET" autocomplete="off">
+        <div class="mob-search-inner" style="position:relative">
+          <input type="text" name="q" value="<?= $searchQ ?>" placeholder="Search products, 20 BF, mill name…" autocomplete="off" id="mob-search-input">
           <button type="submit">Search</button>
           <button type="button" class="mob-search-close" onclick="toggleMobSearch()">✕</button>
+          <div id="mob-search-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:200;background:#fff;border:1.5px solid var(--n200);border-radius:var(--r);box-shadow:0 12px 32px rgba(0,0,0,.14);max-height:340px;overflow-y:auto;margin-top:6px"></div>
         </div>
       </form>
     </div>
@@ -341,6 +343,75 @@ function toggleMobSearch() {
 function closeMobSearch() {
   document.getElementById('mob-search-bar')?.classList.remove('open');
 }
+
+/* ── Live search typeahead (products + mills/vendors) ────── */
+(function(){
+  const BASE_PATH = <?= json_encode(BASE_URL) ?>;
+  let searchTimer = null;
+
+  function esc(s){ return (s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+  function renderResults(box, data, q){
+    const hasProducts = data.products && data.products.length;
+    const hasVendors  = data.vendors && data.vendors.length;
+    if (!hasProducts && !hasVendors) {
+      box.innerHTML = `<div style="padding:16px;text-align:center;font-size:13px;color:var(--n400)">No matches for "${esc(q)}"</div>`;
+      box.style.display = 'block';
+      return;
+    }
+    let html = '';
+    if (hasVendors) {
+      html += `<div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:var(--n400);text-transform:uppercase;letter-spacing:.05em">🏭 Mills / Vendors</div>`;
+      html += data.vendors.map(v => {
+        const label = v.company || v.name;
+        return `<a href="${BASE_PATH}/public/products.php?vendor=${v.id}" style="display:block;padding:9px 14px;text-decoration:none;border-bottom:1px solid var(--n100)">
+                  <div style="font-weight:600;font-size:13.5px;color:var(--n900)">${esc(label)}</div>
+                  <div style="font-size:11.5px;color:var(--n500)">${v.product_count} product${v.product_count==1?'':'s'}</div>
+                </a>`;
+      }).join('');
+    }
+    if (hasProducts) {
+      html += `<div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:var(--n400);text-transform:uppercase;letter-spacing:.05em">📦 Products</div>`;
+      html += data.products.map(p => {
+        const vlabel = p.company || p.vendor_name;
+        return `<a href="${BASE_PATH}/public/product.php?id=${p.id}" style="display:block;padding:9px 14px;text-decoration:none;border-bottom:1px solid var(--n100)">
+                  <div style="font-weight:600;font-size:13.5px;color:var(--n900)">${esc(p.name)}</div>
+                  <div style="font-size:11.5px;color:var(--n500)">🏭 ${esc(vlabel)}${p.price_range ? ' · ₹'+esc(p.price_range) : ''}</div>
+                </a>`;
+      }).join('');
+    }
+    html += `<a href="${BASE_PATH}/public/products.php?q=${encodeURIComponent(q)}" style="display:block;padding:11px 14px;text-align:center;font-weight:700;font-size:13px;color:var(--brand)">See all results for "${esc(q)}" →</a>`;
+    box.innerHTML = html;
+    box.style.display = 'block';
+  }
+
+  function wireSearchInput(inputId, boxId){
+    const input = document.getElementById(inputId);
+    const box   = document.getElementById(boxId);
+    if (!input || !box) return;
+
+    input.addEventListener('input', function(){
+      clearTimeout(searchTimer);
+      const q = this.value.trim();
+      if (q.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      searchTimer = setTimeout(() => {
+        fetch(BASE_PATH + '/public/ajax/search.php?q=' + encodeURIComponent(q))
+          .then(r => r.json())
+          .then(data => renderResults(box, data, q))
+          .catch(() => { box.style.display = 'none'; });
+      }, 250);
+    });
+    input.addEventListener('focus', function(){
+      if (this.value.trim().length >= 2 && box.innerHTML) box.style.display = 'block';
+    });
+    document.addEventListener('click', function(e){
+      if (!e.target.closest('#'+inputId) && !e.target.closest('#'+boxId)) box.style.display = 'none';
+    });
+  }
+
+  wireSearchInput('site-search-input', 'site-search-results');
+  wireSearchInput('mob-search-input', 'mob-search-results');
+})();
 
 /* ── Accordion in mobile drawer ──────────────────────────── */
 function toggleAccordion(btn) {
