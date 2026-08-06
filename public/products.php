@@ -2,6 +2,7 @@
 $pageTitle   = 'Browse Products — PaperMart';
 $currentPage = 'products';
 include __DIR__.'/includes/header.php';
+require_once __DIR__.'/../includes/search_engine.php';
 
 // Filters
 $q          = trim($_GET['q'] ?? '');
@@ -17,22 +18,32 @@ $offset     = ($page-1)*$perPage;
 
 // Build WHERE
 $where = "WHERE p.status='active'"; $params = [];
+$extraConditions = []; $extraParams = [];
+$correctedFrom = null; // set below if the fuzzy "did you mean" fallback kicked in
+if ($industryId) { $extraConditions[] = "p.industry_id=?";     $extraParams[]=$industryId; }
+if ($categoryId) { $extraConditions[] = "p.category_id=?";     $extraParams[]=$categoryId; }
+if ($typeId)     { $extraConditions[] = "p.product_type_id=?"; $extraParams[]=$typeId; }
+if ($vendorId)   { $extraConditions[] = "p.vendor_id=?";        $extraParams[]=$vendorId; }
+foreach ($extraConditions as $c) { $where .= " AND $c"; }
+$params = array_merge($params, $extraParams);
+
 if ($q) {
-    // Matches product name/description/tags, PLUS attribute specs like "20 BF" or
-    // "100 GSM" — typed as "20bf"/"100gsm" (no space) or with a space, either way.
-    // Attribute value+unit are concatenated and normalized (lowercased, spaces
-    // stripped) so "20 BF", "20BF", and "20 bf" all match the same search.
-    $qNorm = strtolower(str_replace(' ', '', $q));
-    $where .= " AND (p.name LIKE ? OR p.description LIKE ? OR p.tags LIKE ? OR EXISTS (
-                    SELECT 1 FROM product_attributes pa WHERE pa.product_id = p.id
-                    AND REPLACE(LOWER(CONCAT(pa.attribute_value, pa.attribute_unit)), ' ', '') LIKE ?
-                ))";
-    $params = array_merge($params, ["%$q%","%$q%","%$q%","%$qNorm%"]);
+    // Advanced search: matches product name/description/tags, category/industry/
+    // type names, vendor name, and ANY product attribute (GSM, BF, thickness,
+    // colour — whatever a vendor has defined), and falls back to a typo-tolerant
+    // "did you mean" correction if the exact typed query finds nothing at all.
+    $extraWhere = implode(' AND ', $extraConditions);
+    $searchResult = runAdvancedSearch($pdo, $q, $extraWhere, $extraParams, 500, 0);
+    $matchedIds = array_column($searchResult['products'], 'id');
+    $correctedFrom = $searchResult['corrected_from'];
+    if ($correctedFrom) $q = $searchResult['query_used']; // display/heading uses the corrected term
+
+    // Fold the matched IDs into the existing filter so the rich product-card
+    // query below (with vendor/industry/category names, logos, etc.) still runs
+    // exactly as before, just scoped to what the search engine matched.
+    $where .= $matchedIds ? " AND p.id IN (" . implode(',', array_fill(0, count($matchedIds), '?')) . ")" : " AND 1=0";
+    $params = array_merge($params, $matchedIds);
 }
-if ($industryId) { $where .= " AND p.industry_id=?";      $params[]=$industryId; }
-if ($categoryId) { $where .= " AND p.category_id=?";      $params[]=$categoryId; }
-if ($typeId)     { $where .= " AND p.product_type_id=?";  $params[]=$typeId; }
-if ($vendorId)   { $where .= " AND p.vendor_id=?";         $params[]=$vendorId; }
 
 $orderBy = match($sort){
   'price_asc'  => "p.price_range ASC",
@@ -79,6 +90,15 @@ $pageTitle = "$heading — PaperMart";
     </div>
   </div>
 </div>
+
+<?php if ($correctedFrom): ?>
+<div class="container" style="padding-top:14px">
+  <div style="background:#fff8e6;border:1px solid #f0d896;border-radius:10px;padding:12px 16px;font-size:13.5px;color:#7a5c00">
+    Showing results for <strong>"<?= sH($q) ?>"</strong> — we couldn't find anything for "<?= sH($correctedFrom) ?>".
+    <a href="?<?= http_build_query(array_merge($_GET,['q'=>$correctedFrom])) ?>" style="color:var(--brand-2);font-weight:600;text-decoration:underline">Search "<?= sH($correctedFrom) ?>" anyway →</a>
+  </div>
+</div>
+<?php endif; ?>
 
 <section class="compact">
   <div class="container">
