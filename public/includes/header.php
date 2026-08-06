@@ -360,6 +360,9 @@ function closeMobSearch() {
       return;
     }
     let html = '';
+    if (data.corrected_from) {
+      html += `<div style="padding:9px 14px;font-size:12px;color:#7a5c00;background:#fff8e6;border-bottom:1px solid #f0d896">Showing results for <strong>"${esc(data.query_used)}"</strong> instead of "${esc(data.corrected_from)}"</div>`;
+    }
     if (hasVendors) {
       html += `<div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:var(--n400);text-transform:uppercase;letter-spacing:.05em">🏭 Mills / Vendors</div>`;
       html += data.vendors.map(v => {
@@ -380,7 +383,8 @@ function closeMobSearch() {
                 </a>`;
       }).join('');
     }
-    html += `<a href="${BASE_PATH}/public/products.php?q=${encodeURIComponent(q)}" style="display:block;padding:11px 14px;text-align:center;font-weight:700;font-size:13px;color:var(--brand)">See all results for "${esc(q)}" →</a>`;
+    const linkQ = data.query_used || q;
+    html += `<a href="${BASE_PATH}/public/products.php?q=${encodeURIComponent(linkQ)}" style="display:block;padding:11px 14px;text-align:center;font-weight:700;font-size:13px;color:var(--brand)">See all results for "${esc(linkQ)}" →</a>`;
     box.innerHTML = html;
     box.style.display = 'block';
   }
