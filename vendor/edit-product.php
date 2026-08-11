@@ -71,6 +71,7 @@ $activePage = 'manage-products';
     </div>
     <div class="topbar-right">
         <a href="<?= BASE_URL ?>/vendor/manage-products.php" class="btn btn-outline btn-sm">← Back</a>
+        <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
     </div>
 </div>
 

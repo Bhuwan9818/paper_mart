@@ -357,7 +357,7 @@ function payForAd(btn){
   </div>
   <div class="topbar-right">
     <a href="?tab=book" class="btn btn-primary btn-sm">+ Book New Ad</a>
-    <div class="topbar-avatar"><?= avatarLetter($user['name']) ?></div>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 <div class="content">

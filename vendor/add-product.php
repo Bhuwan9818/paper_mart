@@ -217,12 +217,7 @@ include __DIR__ . '/../includes/head.php';
 
 <!-- ── Plan blocked ─────────────────────────────────────── -->
 <?php if ($planBlocked): ?>
-<div class="topbar"> 
-  <div class="topbar-left">
-    <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
-    <h1>Add Product</h1>
-  </div>
-</div>
+<div class="topbar"><div class="topbar-left"><button class="hamburger" id="hamburger"><span></span><span></span><span></span></button><h1>Add Product</h1></div><div class="topbar-right"><?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?></div></div>
 <div class="content">
   <div class="card" style="text-align:center;padding:40px">
     <div style="font-size:48px;margin-bottom:16px">🔒</div>
@@ -242,6 +237,7 @@ include __DIR__ . '/../includes/head.php';
     Plan: <strong style="color:var(--primary)"><?= sanitize($sub['plan_name']??'') ?></strong>
     &nbsp;·&nbsp; <?= $productCheck['remaining'] ?> / <?= $productCheck['limit'] ?> left
     &nbsp;|&nbsp; <a href="<?= BASE_URL ?>/public/vendor-profile.php?id=<?= $uid ?>" target="_blank" class="btn btn-outline btn-sm">← Back</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

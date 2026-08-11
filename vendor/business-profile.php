@@ -200,6 +200,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <div class="topbar-right">
     <a href="<?= BASE_URL ?>/public/vendor-profile.php?id=<?= $uid ?>" target="_blank" class="btn btn-outline btn-sm">👁 Public View</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

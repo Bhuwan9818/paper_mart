@@ -13,11 +13,11 @@ $enqCheck  = checkEnquiryLimit($pdo, $uid, $sub);
 
 $totalProducts  = $pdo->prepare("SELECT COUNT(*) FROM products WHERE vendor_id=?"); $totalProducts->execute([$uid]); $totalProducts=$totalProducts->fetchColumn();
 $activeProducts = $pdo->prepare("SELECT COUNT(*) FROM products WHERE vendor_id=? AND status='active'"); $activeProducts->execute([$uid]); $activeProducts=$activeProducts->fetchColumn();
-$totalEnquiries = $pdo->prepare("SELECT COUNT(*) FROM enquiries WHERE vendor_id=?"); $totalEnquiries->execute([$uid]); $totalEnquiries=$totalEnquiries->fetchColumn();
-$openEnquiries  = $pdo->prepare("SELECT COUNT(*) FROM enquiries WHERE vendor_id=? AND status='open'"); $openEnquiries->execute([$uid]); $openEnquiries=$openEnquiries->fetchColumn();
+$totalEnquiries = $pdo->prepare("SELECT COUNT(*) FROM web_enquiries WHERE vendor_id=?"); $totalEnquiries->execute([$uid]); $totalEnquiries=$totalEnquiries->fetchColumn();
+$openEnquiries  = $pdo->prepare("SELECT COUNT(*) FROM web_enquiries WHERE vendor_id=? AND status='new'"); $openEnquiries->execute([$uid]); $openEnquiries=$openEnquiries->fetchColumn();
 $thisMonthEnq   = $usage['enquiries_sent'] ?? 0;
 
-$recentEnq = $pdo->prepare("SELECT e.*,u.name AS cname,p.name AS pname FROM enquiries e JOIN users u ON u.id=e.customer_id LEFT JOIN products p ON p.id=e.product_id WHERE e.vendor_id=? ORDER BY e.created_at DESC LIMIT 5");
+$recentEnq = $pdo->prepare("SELECT we.*, we.name AS cname, p.name AS pname FROM web_enquiries we LEFT JOIN products p ON p.id=we.product_id WHERE we.vendor_id=? ORDER BY we.created_at DESC LIMIT 5");
 $recentEnq->execute([$uid]); $recentEnquiries=$recentEnq->fetchAll();
 
 $recentProds = $pdo->prepare("SELECT p.*,i.name AS iname,pt.name AS tname FROM products p JOIN industries i ON i.id=p.industry_id JOIN product_types pt ON pt.id=p.product_type_id WHERE p.vendor_id=? ORDER BY p.created_at DESC LIMIT 4");
@@ -43,7 +43,7 @@ include __DIR__ . '/../includes/head.php';
     <?php else: ?>
       <a href="<?= BASE_URL ?>/vendor/subscription.php" class="btn btn-warning btn-sm">🔒 Upgrade to Add</a>
     <?php endif; ?>
-    <div class="topbar-avatar"><?= avatarLetter($user['name']) ?></div>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

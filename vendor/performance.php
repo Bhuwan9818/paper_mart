@@ -50,7 +50,7 @@ include __DIR__ . '/../includes/head.php';
 ?>
 <div class="topbar">
   <div class="topbar-left"><button class="hamburger" id="hamburger"><span></span><span></span><span></span></button><h1>Performance Insights</h1></div>
-  <div class="topbar-right"><div class="topbar-avatar"><?= avatarLetter($user['name']) ?></div></div>
+  <div class="topbar-right"><?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?></div>
 </div>
 <div class="content">
   <?= subscriptionBanner($sub) ?>

@@ -111,6 +111,7 @@ include __DIR__ . '/../includes/head.php';
   <div class="topbar-right">
     <a href="<?= BASE_URL ?>/vendor/catalogue-request.php" class="btn btn-outline btn-sm">🗂️ Request Category</a>
     <a href="<?= BASE_URL ?>/vendor/add-product.php" class="btn btn-primary btn-sm">➕ Add Product</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

@@ -74,6 +74,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <div class="topbar-right">
     <a href="<?= BASE_URL ?>/vendor/add-product.php" class="btn btn-outline btn-sm">← Back to Add Product</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

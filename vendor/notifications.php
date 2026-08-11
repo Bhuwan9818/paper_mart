@@ -48,7 +48,7 @@ $colorMap = ['📩'=>'#dbeafe','📦'=>'#d1fae5','💳'=>'#ede9fe','👤'=>'#fce
       <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
       <button class="btn btn-outline btn-sm" type="button" onclick="markAllRead()">✓ Mark All Read</button>
     </form>
-    <div class="topbar-avatar"><?= avatarLetter($user['name']) ?></div>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 <div class="content">
