@@ -21,7 +21,7 @@ $pageTitle='My Profile'; $activePage='profile';
 include __DIR__ . '/../includes/head.php';
 ?>
 <meta name="base-url" content="<?= BASE_URL ?>">
-<div class="topbar"><div class="topbar-left"><button class="hamburger" id="hamburger"><span></span><span></span><span></span></button><h1>My Profile</h1></div></div>
+<div class="topbar"><div class="topbar-left"><button class="hamburger" id="hamburger"><span></span><span></span><span></span></button><h1>My Profile</h1></div><div class="topbar-right"><?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?></div></div>
 <div class="content">
     <?= showFlash() ?>
     <form method="POST">

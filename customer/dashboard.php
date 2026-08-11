@@ -26,7 +26,7 @@ include __DIR__ . '/../includes/head.php';
         <h1>Dashboard</h1>
     </div>
     <div class="topbar-right">
-        <div class="topbar-avatar"><?= avatarLetter($user['name']) ?></div>
+        <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
     </div>
 </div>
 <div class="content">
