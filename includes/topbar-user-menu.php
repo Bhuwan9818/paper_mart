@@ -1,11 +1,5 @@
 <?php
-// ============================================================
-// includes/topbar-user-menu.php
-// Shared avatar dropdown for the dashboard topbar — used on every
-// vendor/admin/customer page. Include with:
-//   <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
-// Expects $user (from currentUser()) to already be set by the including page.
-// ============================================================
+
 if (!isset($user)) { $user = function_exists('currentUser') ? currentUser() : null; }
 if (!$user) return;
 
