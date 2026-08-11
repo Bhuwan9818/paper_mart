@@ -118,6 +118,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <div class="topbar-right">
     <a href="add-product.php" class="btn btn-primary btn-sm">+ Add Product</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

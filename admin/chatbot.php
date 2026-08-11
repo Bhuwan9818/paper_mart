@@ -174,6 +174,7 @@ table.t{width:100%;border-collapse:collapse;font-size:13px}
       <p style="margin:4px 0 0;color:#888;font-size:13px">Manage intents, keywords, responses, tickets — no AI API needed.</p>
     </div>
     </div>
+    <div class="topbar-right"><?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?></div>
 </div>
 
 

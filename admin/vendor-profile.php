@@ -168,6 +168,7 @@ include __DIR__ . '/../includes/head.php';
   <div class="topbar-right" style="gap:8px">
     <a href="<?= BASE_URL ?>/public/vendor-profile.php?id=<?= $vid ?>" target="_blank" class="btn btn-outline btn-sm">👁 Public View</a>
     <a href="vendors.php" class="btn btn-outline btn-sm">← All Vendors</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

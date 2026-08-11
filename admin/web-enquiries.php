@@ -26,6 +26,7 @@ include __DIR__ . '/../includes/head.php';
 ?>
 <div class="topbar">
   <div class="topbar-left"><button class="hamburger" id="hamburger"><span></span><span></span><span></span></button><h1>Web Enquiries</h1></div>
+  <div class="topbar-right"><?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?></div>
 </div>
 <div class="content">
   <?= showFlash() ?>

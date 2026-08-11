@@ -80,6 +80,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <div class="topbar-right">
     <a href="reports.php?type=subscriptions" class="btn btn-outline btn-sm">📥 Export CSV</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 <div class="content">

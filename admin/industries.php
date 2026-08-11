@@ -116,6 +116,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <div class="topbar-right" style="font-size:13px;color:var(--text-muted)">
     <?= count($industries) ?> total
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

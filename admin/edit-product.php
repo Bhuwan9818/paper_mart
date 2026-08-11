@@ -145,6 +145,7 @@ include __DIR__ . '/../includes/head.php';
   <div class="topbar-right" style="gap:8px">
     <a href="view-product.php?id=<?= $pid ?>" class="btn btn-outline btn-sm">👁 View</a>
     <a href="products.php" class="btn btn-outline btn-sm">← All Products</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

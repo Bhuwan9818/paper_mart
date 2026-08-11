@@ -112,6 +112,7 @@ include __DIR__ . '/../includes/head.php';
     <?php if($counts['pending']>0): ?>
     <span class="btn btn-warning btn-sm" style="pointer-events:none">⏳ <?=$counts['pending']?> Pending</span>
     <?php endif; ?>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

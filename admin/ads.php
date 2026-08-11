@@ -205,6 +205,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <div class="topbar-right">
     <a href="ads.php?tab=fallback" class="btn btn-outline btn-sm">🖼️ Fallback Banners</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 <div class="content">

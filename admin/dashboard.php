@@ -135,7 +135,7 @@ include __DIR__ . '/../includes/head.php';
       <a href="<?= BASE_URL ?>/admin/products.php?status=pending" class="btn btn-warning btn-sm">⏳ <?= $stats['pending'] ?> Pending</a>
     <?php endif; ?>
     <a href="<?= BASE_URL ?>/admin/reports.php" class="btn btn-outline btn-sm">📄 Reports</a>
-    <div class="topbar-avatar"><?= avatarLetter($user['name']) ?></div>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

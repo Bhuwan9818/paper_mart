@@ -94,6 +94,13 @@ $banners = $pdo->query("SELECT * FROM banners ORDER BY sort_order ASC, id ASC")-
 $pageTitle = 'Hero Banners'; $activePage = 'banners';
 include __DIR__ . '/../includes/head.php';
 ?>
+<div class="topbar">
+    <div class="topbar-left">
+        <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+        <h1>Hero Banners</h1>
+    </div>
+    <div class="topbar-right"><?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?></div>
+</div>
 <div class="content">
     <?= showFlash() ?>
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">

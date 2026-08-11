@@ -36,6 +36,7 @@ include __DIR__ . '/../includes/head.php';
             <a href="products.php?action=approve&id=<?= $id ?>" class="btn btn-success btn-sm" onclick="return confirm('Approve?')">✅ Approve</a>
             <a href="products.php?action=reject&id=<?= $id ?>"  class="btn btn-danger  btn-sm" onclick="return confirm('Reject?')">❌ Reject</a>
         <?php endif; ?>
+        <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
     </div>
 </div>
 <div class="content">

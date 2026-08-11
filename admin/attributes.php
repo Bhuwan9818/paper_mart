@@ -82,6 +82,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <div class="topbar-right" style="font-size:13px;color:var(--text-muted)">
     <?= $totalCount ?> attribute<?= $totalCount !== 1 ? 's' : '' ?> total
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 

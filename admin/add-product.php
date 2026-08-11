@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $vendors    = $pdo->query("SELECT id,name,email,company FROM users WHERE role='vendor' AND status='active' ORDER BY name")->fetchAll();
 $industries = getAllIndustries($pdo);
 $pageTitle  = 'Add Product (Admin)';
-$activePage = 'admin-add-products';
+$activePage = 'products';
 include __DIR__ . '/../includes/head.php';
 ?>
 <meta name="base-url" content="<?= BASE_URL ?>">
@@ -212,6 +212,7 @@ include __DIR__ . '/../includes/head.php';
   </div>
   <div class="topbar-right">
     <a href="<?= BASE_URL ?>/admin/products.php" class="btn btn-outline btn-sm">← Products</a>
+    <?php include __DIR__ . '/../includes/topbar-user-menu.php'; ?>
   </div>
 </div>
 
