@@ -168,9 +168,10 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
           <select name="type" id="as-type" class="ad-search-field" disabled>
             <option value="">Select Category first…</option>
           </select>
+          <!-- <input type="text" name="q" placeholder="Product, GSM, specification…" class="ad-search-field"> -->
         </div>
 
-        <input type="text" name="q" placeholder="Product, GSM, specification…" class="ad-search-field">
+        
         <button type="submit" class="ad-search-submit">Search Products</button>
       </form>
       <a href="<?= BASE_URL ?>/public/products.php" class="ad-search-advanced">Browse All Categories →</a>
