@@ -451,18 +451,22 @@ section.compact{padding:40px 0}
    banner is quite short here (~180-220px), so overlaying a multi-field
    card risks it overflowing the image bounds. Letting it flow naturally
    below the banner instead avoids that entirely, at any content height. */
-.ad-stage-inner{
+/* .ad-stage-inner{
   position:static;
   inset:auto;
   padding:16px 0;
   background:var(--n50);
-}
-.ad-search-card{
+} */
+/* .ad-search-card{
   box-shadow:0 4px 16px rgba(0,0,0,.10);
   margin:0 auto;
   width:100%;
   max-width:420px;
-}
+} */
+
+.ad-stage-inner{
+    display: none;
+  }
 }
 
 /* Phone: min-height floor is the only override.
@@ -475,6 +479,7 @@ section.compact{padding:40px 0}
        (max natural height here is only 180px at 480px wide) */
     max-height:none;
   }
+  
   .ad-progress-inner{gap:6px;padding-bottom:10px}
   .ad-progress-btn{width:24px;height:24px}
 }

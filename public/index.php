@@ -652,7 +652,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 
 .compare-group{
   display:grid;
-  grid-template-columns: 1fr !important;
+  grid-template-columns: 1fr;
 }
 </style>
 
