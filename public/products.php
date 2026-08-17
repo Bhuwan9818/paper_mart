@@ -10,6 +10,7 @@ $industryId = (int)($_GET['industry'] ?? 0);
 $categoryId = (int)($_GET['category'] ?? 0);
 $typeId     = (int)($_GET['type'] ?? 0);
 $vendorId   = (int)($_GET['vendor'] ?? 0);
+$country    = trim($_GET['country'] ?? '');
 $sort       = $_GET['sort'] ?? 'newest';
 $view       = $_GET['view'] ?? 'grid';
 $page       = max(1,(int)($_GET['page'] ?? 1));
@@ -24,6 +25,7 @@ if ($industryId) { $extraConditions[] = "p.industry_id=?";     $extraParams[]=$i
 if ($categoryId) { $extraConditions[] = "p.category_id=?";     $extraParams[]=$categoryId; }
 if ($typeId)     { $extraConditions[] = "p.product_type_id=?"; $extraParams[]=$typeId; }
 if ($vendorId)   { $extraConditions[] = "p.vendor_id=?";        $extraParams[]=$vendorId; }
+if ($country)    { $extraConditions[] = "u.country=?";          $extraParams[]=$country; }
 foreach ($extraConditions as $c) { $where .= " AND $c"; }
 $params = array_merge($params, $extraParams);
 
@@ -52,7 +54,7 @@ $orderBy = match($sort){
   default      => "p.created_at DESC"
 };
 
-$countStmt=$pdo->prepare("SELECT COUNT(*) FROM products p $where");
+$countStmt=$pdo->prepare("SELECT COUNT(*) FROM products p JOIN users u ON u.id=p.vendor_id $where");
 $countStmt->execute($params); $total=$countStmt->fetchColumn();
 
 $params2=$params; $params2[]=$perPage; $params2[]=$offset;
@@ -76,6 +78,7 @@ if ($q)          $heading = "Results for \"".sH($q)."\"";
 elseif($categoryId){ $cn=$pdo->query("SELECT name FROM categories WHERE id=$categoryId")->fetchColumn(); $heading=sH($cn??'Category'); }
 elseif($industryId){ $in=$pdo->query("SELECT name FROM industries WHERE id=$industryId")->fetchColumn(); $heading=sH($in??'Industry'); }
 elseif($vendorId){ $vn=$pdo->prepare("SELECT COALESCE(company,name) FROM users WHERE id=?"); $vn->execute([$vendorId]); $vnName=$vn->fetchColumn(); $heading=sH($vnName??'Vendor'); }
+elseif($country){ $heading = 'Products from ' . sH($country); }
 $selectedVendorName = null;
 if ($vendorId) { $sv=$pdo->prepare("SELECT COALESCE(company,name) FROM users WHERE id=?"); $sv->execute([$vendorId]); $selectedVendorName = $sv->fetchColumn(); }
 $pageTitle = "$heading — PaperMart";
@@ -292,6 +295,7 @@ include __DIR__.'/includes/footer.php';
     <div class="modal-body">
       <div id="enq-success" class="site-alert site-alert-success" style="display:none"></div>
       <form id="enq-form" onsubmit="submitEnquiry(event)">
+      <?php honeypotField(); ?>
         <input type="hidden" id="enq-product-id" name="product_id">
         <input type="hidden" id="enq-vendor-id"  name="vendor_id">
         <div id="enq-product-name" style="background:var(--n50);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:16px;font-weight:600;font-size:13.5px;color:var(--brand)"></div>

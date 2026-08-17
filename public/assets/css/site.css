@@ -160,6 +160,11 @@ section.compact{padding:40px 0}
 }
 .ad-slide.active{opacity:1}
 
+/* Wraps .ad-stage + the search card so the card can be absolutely
+   positioned (overlay) on desktop but flow as a normal sibling on mobile
+   without being clipped by .ad-stage's own overflow:hidden. */
+.ad-stage-wrap{position:relative !important}
+
 /* CONTENT OVERLAY: search card + progress bar.
    Must be position:absolute so it overlays the stage without adding
    any height to it. The previous position:relative version with an
@@ -205,7 +210,7 @@ section.compact{padding:40px 0}
 }
 .ad-search-card h3{
   font-family:'Poppins',sans-serif;
-  font-size:clamp(12px,1.3vw,18px);
+  font-size:clamp(10px,1vw,14px);
   font-weight:700;
   color:var(--n900);
   margin-bottom:clamp(10px,1.1vw,14px);
@@ -243,6 +248,54 @@ section.compact{padding:40px 0}
   text-decoration:none;font-weight:600;
 }
 .ad-search-advanced:hover{color:var(--brand-2)}
+
+/* Mode toggle: "By Country" / "By Industry" — matches existing brand colors */
+.ad-search-toggle{
+  display:flex;
+  gap:8px;
+  margin-bottom:clamp(10px,1.1vw,14px);
+}
+.ad-search-radio{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:clamp(7px,0.7vw,9px) 6px;
+  border:1.5px solid var(--n200);
+  border-radius:var(--r-sm);
+  font-size:clamp(11px,0.95vw,12.5px);
+  font-weight:600;
+  color:var(--n700);
+  cursor:pointer;
+  transition:border-color .15s ease,color .15s ease,background .15s ease;
+  font-family:'DM Sans',sans-serif;
+  user-select:none;
+}
+.ad-search-radio input{position:absolute;opacity:0;pointer-events:none}
+.ad-search-radio-dot{
+  width:14px;height:14px;flex-shrink:0;
+  border-radius:50%;
+  border:1.5px solid var(--n300);
+  position:relative;
+  transition:border-color .15s ease;
+}
+.ad-search-radio-dot::after{
+  content:'';
+  position:absolute;inset:3px;
+  border-radius:50%;
+  background:var(--brand);
+  transform:scale(0);
+  transition:transform .15s ease;
+}
+.ad-search-radio:has(input:checked){
+  border-color:var(--brand);
+  color:var(--brand);
+  background:var(--brand-3);
+}
+.ad-search-radio:has(input:checked) .ad-search-radio-dot{border-color:var(--brand)}
+.ad-search-radio:has(input:checked) .ad-search-radio-dot::after{transform:scale(1)}
+.as-group{margin-bottom:2px}
 
 /* PROGRESS BAR: absolute bottom edge.
    Gradient fades from transparent to dark at the very bottom — gives
@@ -354,13 +407,9 @@ section.compact{padding:40px 0}
    BREAKPOINTS — AD STAGE
    ─────────────────────────────────────────────────────────────── */
 
-/* Hide search card on tablet and phone.
-   No height change needed — aspect-ratio still drives proportional sizing. */
-@media(max-width:600px){
-  .ad-search-card{display:none}
-  
- 
-}
+/* Search card stays visible on tablet and phone now — it only shows 2
+   fields at a time (mode toggle + cascading dropdowns), so it comfortably
+   fits even on small screens. The 768px block below handles its sizing. */
 
 /* Slightly tighter progress bar on small screens */
 @media(max-width:768px){
@@ -389,6 +438,30 @@ section.compact{padding:40px 0}
 .ad-search-card{
   padding:clamp(12px,1.8vw,26px) clamp(10px,1.6vw,24px);
   width:clamp(200px,22vw,320px);
+}
+
+.ad-search-radio{
+  font-size:clamp(9px,1vw,12.5px);
+  padding:clamp(6px,0.7vw,9px) 4px;
+  gap:4px;
+}
+.ad-search-radio-dot{width:11px;height:11px}
+
+/* Un-overlay the card from the hero image on mobile/tablet — the hero
+   banner is quite short here (~180-220px), so overlaying a multi-field
+   card risks it overflowing the image bounds. Letting it flow naturally
+   below the banner instead avoids that entirely, at any content height. */
+.ad-stage-inner{
+  position:static;
+  inset:auto;
+  padding:16px 0;
+  background:var(--n50);
+}
+.ad-search-card{
+  box-shadow:0 4px 16px rgba(0,0,0,.10);
+  margin:0 auto;
+  width:100%;
+  max-width:420px;
 }
 }
 

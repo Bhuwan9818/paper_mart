@@ -13,6 +13,16 @@ $totalVends  = $pdo->query("SELECT COUNT(*) FROM users WHERE role='vendor' AND s
 $totalEnqs   = $pdo->query("SELECT COUNT(*) FROM web_enquiries")->fetchColumn();
 $categories  = $pdo->query("SELECT c.*,i.name AS iname,(SELECT COUNT(*) FROM products WHERE category_id=c.id AND status='active') AS prod_count FROM categories c JOIN industries i ON i.id=c.industry_id WHERE c.status=1 ORDER BY prod_count DESC LIMIT 12")->fetchAll();
 
+// Countries vendors operate from, and the full active industries list —
+// for the two modes of the hero search card (By Country / By Industry).
+$searchCardIndustries = $pdo->query("SELECT id, name FROM industries WHERE status=1 ORDER BY sort_order, name")->fetchAll();
+$heroCountries = $pdo->query(
+    "SELECT DISTINCT u.country
+     FROM users u JOIN products p ON p.vendor_id=u.id AND p.status='active'
+     WHERE u.role='vendor' AND u.status='active' AND u.country IS NOT NULL AND u.country <> ''
+     ORDER BY u.country ASC"
+)->fetchAll(PDO::FETCH_COLUMN);
+
 // Hero carousel — priority order:
 // 1. Vendor banner_ads that are currently running in an active time slot
 // 2. Admin-managed fallback banners (when no vendor ads are running)
@@ -62,6 +72,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 ?>
 
 <!-- AD DISPLAY SECTION -->
+<div class="ad-stage-wrap">
 <section class="ad-stage" id="hero-carousel">
   <?php if ($heroBanners): ?>
     <div class="ad-slides" aria-hidden="true">
@@ -71,31 +82,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
              alt="<?= sH($b['title'] ?: 'Promotional banner') ?>"
              loading="<?= $i===0?'eager':'lazy' ?>" decoding="async">
       <?php endforeach; ?>
-    </div>
-    <!-- Search card overlay: position:absolute fills .ad-stage, flex aligns card vertically -->
-    <div class="ad-stage-inner">
-      <div class="container">
-        <div class="ad-search-card">
-          <h3>Find Your Products</h3>
-          <form action="<?= BASE_URL ?>/public/products.php" method="GET">
-            <select name="industry" class="ad-search-field">
-              <option value="">All Industries</option>
-              <?php foreach($industries as $ind): ?>
-                <option value="<?= $ind['id'] ?>"><?= sH($ind['name']) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <select name="category" class="ad-search-field">
-              <option value="">All Categories</option>
-              <?php foreach($categories as $cat): ?>
-                <option value="<?= $cat['id'] ?>"><?= sH($cat['name']) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <input type="text" name="q" placeholder="Product, GSM, specification…" class="ad-search-field">
-            <button type="submit" class="ad-search-submit">Search Products</button>
-          </form>
-          <a href="<?= BASE_URL ?>/public/products.php" class="ad-search-advanced">Browse All Categories →</a>
-        </div>
-      </div>
     </div>
     <?php if (count($heroBanners) > 1): ?>
     <!-- Progress bar: position:absolute sticks to bottom of .ad-stage -->
@@ -130,6 +116,69 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
     </div>
   <?php endif; ?>
 </section>
+
+<?php if ($heroBanners): ?>
+<!-- Search card: sibling of .ad-stage, not a child — this is deliberate.
+     .ad-stage has overflow:hidden + a fixed aspect-ratio height, so on
+     mobile (where the card flows below the banner instead of overlaying
+     it) a child element would get clipped. Being a sibling inside the
+     same .ad-stage-wrap avoids that, while CSS still visually overlays it
+     on desktop via absolute positioning. -->
+<div class="ad-stage-inner">
+  <div class="container">
+    <div class="ad-search-card">
+      <h3>Find Your Products</h3>
+
+      <div class="ad-search-toggle">
+        <label class="ad-search-radio">
+          <input type="radio" name="search-mode" value="country" onchange="asSwitchMode('country')">
+          <span class="ad-search-radio-dot"></span> By Country
+        </label>
+        <label class="ad-search-radio">
+          <input type="radio" name="search-mode" value="industry" checked onchange="asSwitchMode('industry')">
+          <span class="ad-search-radio-dot"></span> By Industry
+        </label>
+      </div>
+
+      <form action="<?= BASE_URL ?>/public/products.php" method="GET" id="hero-search-form">
+        <!-- Country mode -->
+        <div id="as-group-country" class="as-group" style="display:none">
+          <select name="country" id="as-country" class="ad-search-field" onchange="asOnCountryChange()">
+            <option value="">Select Country</option>
+            <?php foreach($heroCountries as $c): ?>
+              <option value="<?= sH($c) ?>"><?= sH($c) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <select name="vendor" id="as-brand" class="ad-search-field" disabled>
+            <option value="">Select Country first…</option>
+          </select>
+        </div>
+
+        <!-- Industry mode -->
+        <div id="as-group-industry" class="as-group">
+          <select name="industry" id="as-industry" class="ad-search-field" onchange="asOnIndustryChange()">
+            <option value="">Select Industry</option>
+            <?php foreach($searchCardIndustries as $ind): ?>
+              <option value="<?= $ind['id'] ?>"><?= sH($ind['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <select name="category" id="as-category" class="ad-search-field" onchange="asOnCategoryChange()" disabled>
+            <option value="">Select Industry first…</option>
+          </select>
+          <select name="type" id="as-type" class="ad-search-field" disabled>
+            <option value="">Select Category first…</option>
+          </select>
+        </div>
+
+        <input type="text" name="q" placeholder="Product, GSM, specification…" class="ad-search-field">
+        <button type="submit" class="ad-search-submit">Search Products</button>
+      </form>
+      <a href="<?= BASE_URL ?>/public/products.php" class="ad-search-advanced">Browse All Categories →</a>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+</div><!-- /.ad-stage-wrap -->
 
 <!-- STATS STRIP -->
 <section class="stats-strip">
@@ -187,6 +236,89 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 })();
 </script>
 <?php endif; ?>
+
+<script>
+(function(){
+  const BASE_PATH = <?= json_encode(BASE_URL) ?>;
+
+  window.asSwitchMode = function(mode){
+    const countryGroup  = document.getElementById('as-group-country');
+    const industryGroup = document.getElementById('as-group-industry');
+    const showCountry = mode === 'country';
+
+    countryGroup.style.display  = showCountry ? 'block' : 'none';
+    industryGroup.style.display = showCountry ? 'none'  : 'block';
+
+    // Disable every field in the hidden group (so stale selections never
+    // get submitted alongside the active mode's filters) and re-enable the
+    // visible group's top-level field. Dependent fields (brand/category/
+    // type) stay disabled until their parent is actually chosen.
+    countryGroup.querySelectorAll('select').forEach(el => el.disabled = !showCountry);
+    industryGroup.querySelectorAll('select').forEach(el => el.disabled = showCountry);
+
+    if (showCountry) {
+      document.getElementById('as-brand').disabled = !document.getElementById('as-country').value;
+    } else {
+      document.getElementById('as-category').disabled = !document.getElementById('as-industry').value;
+      document.getElementById('as-type').disabled = !document.getElementById('as-category').value;
+    }
+  };
+
+  window.asOnCountryChange = function(){
+    const country = document.getElementById('as-country').value;
+    const brandSel = document.getElementById('as-brand');
+    brandSel.innerHTML = '<option value="">Loading…</option>';
+    brandSel.disabled = true;
+    if (!country) { brandSel.innerHTML = '<option value="">Select Country first…</option>'; return; }
+
+    fetch(BASE_PATH + '/public/ajax/get-brands-by-country.php?country=' + encodeURIComponent(country))
+      .then(r => r.json())
+      .then(list => {
+        if (!list.length) { brandSel.innerHTML = '<option value="">No brands in this country</option>'; return; }
+        brandSel.innerHTML = '<option value="">Select Brand</option>' +
+          list.map(b => `<option value="${b.id}">${b.label.replace(/</g,'&lt;')}</option>`).join('');
+        brandSel.disabled = false;
+      })
+      .catch(() => { brandSel.innerHTML = '<option value="">Could not load brands</option>'; });
+  };
+
+  window.asOnIndustryChange = function(){
+    const industryId = document.getElementById('as-industry').value;
+    const catSel = document.getElementById('as-category');
+    const typeSel = document.getElementById('as-type');
+    catSel.innerHTML = '<option value="">Loading…</option>'; catSel.disabled = true;
+    typeSel.innerHTML = '<option value="">Select Category first…</option>'; typeSel.disabled = true;
+    if (!industryId) { catSel.innerHTML = '<option value="">Select Industry first…</option>'; return; }
+
+    fetch(BASE_PATH + '/public/ajax/get-categories-with-products.php?industry_id=' + industryId)
+      .then(r => r.json())
+      .then(list => {
+        if (!list.length) { catSel.innerHTML = '<option value="">No categories available</option>'; return; }
+        catSel.innerHTML = '<option value="">Select Category</option>' +
+          list.map(c => `<option value="${c.id}">${c.name.replace(/</g,'&lt;')}</option>`).join('');
+        catSel.disabled = false;
+      })
+      .catch(() => { catSel.innerHTML = '<option value="">Could not load categories</option>'; });
+  };
+
+  window.asOnCategoryChange = function(){
+    const categoryId = document.getElementById('as-category').value;
+    const typeSel = document.getElementById('as-type');
+    typeSel.innerHTML = '<option value="">Loading…</option>'; typeSel.disabled = true;
+    if (!categoryId) { typeSel.innerHTML = '<option value="">Select Category first…</option>'; return; }
+
+    fetch(BASE_PATH + '/public/ajax/get-product-types-with-products.php?category_id=' + categoryId)
+      .then(r => r.json())
+      .then(list => {
+        if (!list.length) { typeSel.innerHTML = '<option value="">No product types available</option>'; return; }
+        typeSel.innerHTML = '<option value="">Select Product Type</option>' +
+          list.map(t => `<option value="${t.id}">${t.name.replace(/</g,'&lt;')}</option>`).join('');
+        typeSel.disabled = false;
+      })
+      .catch(() => { typeSel.innerHTML = '<option value="">Could not load product types</option>'; });
+  };
+})();
+</script>
 
 <!-- BROWSE CATEGORIES CAROUSEL -->
 <section class="cat-carousel-section">
@@ -519,7 +651,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 
 .compare-group{
   display:grid;
-  grid-template-columns: 1fr ;
+  grid-template-columns: 1fr !important;
 }
 </style>
 
@@ -753,6 +885,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
     <div class="modal-body">
       <div id="enq-success" class="site-alert site-alert-success" style="display:none"></div>
       <form id="enq-form" onsubmit="submitEnquiry(event)">
+      <?php honeypotField(); ?>
         <input type="hidden" id="enq-product-id" name="product_id">
         <input type="hidden" id="enq-vendor-id"  name="vendor_id">
         <div id="enq-product-name" style="background:var(--n50);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:16px;font-weight:600;font-size:13.5px;color:var(--brand)"></div>
