@@ -10,14 +10,31 @@ try {
     $stmt->execute([$sessionKey]); $products=$stmt->fetchAll();
 } catch(Exception $e) { $products=[]; }
 
-// Get all unique attribute names across compared products
+// Get all unique attribute names across compared products, and collect
+// each product's TDS report file(s) separately — TDS is stored as a
+// special "__tds" attribute row (same convention as the single product
+// page), so it must be excluded from the visible spec comparison table
+// (it would otherwise show up as a garbled row with a filename as its
+// "value") and instead surfaced as a proper download link.
 $allAttrNames=[];
 $productAttrs=[];
+$productTds=[];
 foreach($products as $p){
     $as=$pdo->prepare("SELECT * FROM product_attributes WHERE product_id=? ORDER BY sort_order");
     $as->execute([$p['id']]); $list=$as->fetchAll();
     $productAttrs[$p['id']]=[];
-    foreach($list as $a){ $productAttrs[$p['id']][$a['attribute_name']]=$a['attribute_value'].($a['attribute_unit']?' '.$a['attribute_unit']:''); $allAttrNames[$a['attribute_name']]=true; }
+    $productTds[$p['id']]=[];
+    foreach($list as $a){
+        $an = strtolower(trim($a['attribute_name'] ?? ''));
+        if ($an==='__tds' || stripos($an,'tds')!==false) {
+            $fname = basename(trim($a['attribute_value'] ?? ''));
+            if ($fname && file_exists(__DIR__.'/../assets/tds/'.$fname)) $productTds[$p['id']][] = $fname;
+            continue; // never treat this as a comparable spec
+        }
+        $productAttrs[$p['id']][$a['attribute_name']]=$a['attribute_value'].($a['attribute_unit']?' '.$a['attribute_unit']:'');
+        $allAttrNames[$a['attribute_name']]=true;
+    }
+    $productTds[$p['id']] = array_values(array_unique($productTds[$p['id']]));
 }
 $allAttrNames=array_keys($allAttrNames);
 
@@ -86,6 +103,10 @@ $industries = $pdo->query(
               <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" style="font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:var(--n900);display:block;margin-bottom:5px"><?= sH($p['name']) ?></a>
               <div style="font-size:12px;color:var(--n500);margin-bottom:4px"><?= sH($p['cname']) ?></div>
               <div style="font-size:12.5px;font-weight:600;color:var(--brand);margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:4px">🏭 <?= sH($p['company'] ?: $p['vname']) ?><?php if($p['is_verified']): ?><span title="Verified Vendor" style="color:var(--success,#16a34a)">✓</span><?php endif; ?></div>
+              <?php foreach ($productTds[$p['id']] ?? [] as $tdsIdx => $tdsFile): ?>
+              <a href="<?= BASE_URL ?>/assets/tds/<?= sH($tdsFile) ?>" target="_blank" download
+                 class="btn btn-outline btn-sm btn-full" style="margin-bottom:6px;color:#9d174d;border-color:#f9a8d4">📄 Download TDS<?= count($productTds[$p['id']])>1 ? ' ('.($tdsIdx+1).')' : '' ?></a>
+              <?php endforeach; ?>
               <button class="btn btn-accent btn-sm btn-full" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">📩 Enquire</button>
               <button class="btn btn-outline btn-sm btn-full" style="margin-top:6px" onclick="removeFromComparePage(<?= $p['id'] ?>)">Remove</button>
             </th>
@@ -149,6 +170,10 @@ $industries = $pdo->query(
             <td>
               <div style="display:flex;flex-direction:column;gap:6px">
                 <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" class="btn btn-primary btn-sm btn-full">View Details</a>
+                <?php foreach ($productTds[$p['id']] ?? [] as $tdsIdx => $tdsFile): ?>
+                <a href="<?= BASE_URL ?>/assets/tds/<?= sH($tdsFile) ?>" target="_blank" download
+                   class="btn btn-outline btn-sm btn-full" style="color:#9d174d;border-color:#f9a8d4">📄 Download TDS<?= count($productTds[$p['id']])>1 ? ' ('.($tdsIdx+1).')' : '' ?></a>
+                <?php endforeach; ?>
                 <button class="btn btn-accent btn-sm btn-full" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">📩 Enquire</button>
               </div>
             </td>
