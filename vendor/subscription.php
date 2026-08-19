@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['plan_id'])) {
 }
 
 $plans = $pdo->query("SELECT * FROM subscription_plans WHERE is_active=1 ORDER BY sort_order")->fetchAll();
-$payments = $pdo->prepare("SELECT sp.*,p.name AS plan_name FROM subscription_payments sp JOIN subscription_plans p ON p.id=sp.plan_id WHERE sp.vendor_id=? ORDER BY sp.created_at DESC LIMIT 10");
+$payments = $pdo->prepare("SELECT sp.*,p.name AS plan_name, (SELECT id FROM invoices WHERE type='subscription' AND reference_id=sp.id LIMIT 1) AS invoice_id FROM subscription_payments sp JOIN subscription_plans p ON p.id=sp.plan_id WHERE sp.vendor_id=? ORDER BY sp.created_at DESC LIMIT 10");
 $payments->execute([$uid]); $payments=$payments->fetchAll();
 
 $prodCheck = checkProductLimit($pdo,$uid,$sub);
@@ -164,7 +164,7 @@ include __DIR__ . '/../includes/head.php';
     <div class="card-header"><h2>🧾 Payment History</h2></div>
     <div class="table-wrapper">
       <table>
-        <thead><tr><th>Date</th><th>Plan</th><th>Amount</th><th>Cycle</th><th>Status</th></tr></thead>
+        <thead><tr><th>Date</th><th>Plan</th><th>Amount</th><th>Cycle</th><th>Status</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($payments as $p): ?>
           <tr>
@@ -173,6 +173,7 @@ include __DIR__ . '/../includes/head.php';
             <td>₹<?= number_format($p['amount'],2) ?></td>
             <td><?= ucfirst($p['billing_cycle']??'monthly') ?></td>
             <td><?= statusBadge($p['status']) ?></td>
+            <td><?php if ($p['invoice_id']): ?><a href="invoice.php?id=<?= $p['invoice_id'] ?>" target="_blank" class="btn btn-outline btn-xs">🧾 Invoice</a><?php endif; ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
