@@ -36,6 +36,7 @@ $vendorNav = [
     ['icon'=>'🚀', 'label'=>'Performance',        'href'=>BASE_URL.'/vendor/performance.php',   'page'=>'performance', 'perm'=>'performance'],
     ['section'=>'Account'],
     ['icon'=>'💳', 'label'=>'Subscription',      'href'=>BASE_URL.'/vendor/subscription.php',  'page'=>'subscription', 'ownerOnly'=>true],
+    ['icon'=>'🧾', 'label'=>'Invoices',          'href'=>BASE_URL.'/vendor/invoices.php',      'page'=>'invoices', 'ownerOnly'=>true],
     ['icon'=>'🎯', 'label'=>'Banner Ads',         'href'=>BASE_URL.'/vendor/ads.php',           'page'=>'ads', 'perm'=>'ads'],
     // ['icon'=>'👤', 'label'=>'My Profile',         'href'=>BASE_URL.'/vendor/profile.php',       'page'=>'profile'],
     ['icon'=>'🏢', 'label'=>'Business Profile',    'href'=>BASE_URL.'/vendor/business-profile.php','page'=>'business-profile', 'perm'=>'business-profile'],
@@ -61,12 +62,16 @@ $adminNav = [
     ['icon'=>'➕','label'=>'Add Product', 'href'=>BASE_URL.'/admin/add-product.php',    'page'=>'admin-add-products'],
     ['section'=>'Finance'],
     ['icon'=>'💰','label'=>'Payments',        'href'=>BASE_URL.'/admin/payments.php',      'page'=>'payments'],
+    ['icon'=>'🧾','label'=>'Invoices',        'href'=>BASE_URL.'/admin/invoices.php',      'page'=>'invoices'],
     ['icon'=>'💳','label'=>'Subscriptions',   'href'=>BASE_URL.'/admin/subscriptions.php', 'page'=>'subscriptions'],
     ['icon'=>'🎯','label'=>'Ad Management',   'href'=>BASE_URL.'/admin/ads.php',           'page'=>'ads'],
     ['section'=>'Intelligence'],
     ['icon'=>'💬', 'label'=>'Chatbot Manager', 'href'=>BASE_URL.'/admin/chatbot.php?tab=intents', 'page'=>'chatbot'],
     ['icon'=>'📈','label'=>'Analytics',       'href'=>BASE_URL.'/admin/analytics.php',     'page'=>'analytics'],
     ['icon'=>'📄','label'=>'Reports',         'href'=>BASE_URL.'/admin/reports.php',       'page'=>'reports'],
+    ['section'=>'System'],
+    ['icon'=>'🕵️','label'=>'Activity Log',    'href'=>BASE_URL.'/admin/activity-log.php',  'page'=>'activity-log'],
+    ['icon'=>'💾','label'=>'Backups',          'href'=>BASE_URL.'/admin/backup.php',        'page'=>'backup'],
 ];
 
 $customerNav = [
