@@ -57,7 +57,7 @@ try {
 
 // Recent Razorpay gateway transactions (subscription + ad payments), for reconciliation.
 try {
-    $gatewayTxns = $pdo->query("SELECT pt.*, u.name AS vendor_name, u.company FROM payment_transactions pt JOIN users u ON u.id=pt.vendor_id ORDER BY pt.created_at DESC LIMIT 15")->fetchAll();
+    $gatewayTxns = $pdo->query("SELECT pt.*, u.name AS vendor_name, u.company, (SELECT id FROM invoices WHERE payment_transaction_id=pt.id LIMIT 1) AS invoice_id FROM payment_transactions pt JOIN users u ON u.id=pt.vendor_id ORDER BY pt.created_at DESC LIMIT 15")->fetchAll();
 } catch (Exception $e) {
     $gatewayTxns = []; // table not migrated yet — page still works, just skips this section
 }
@@ -82,7 +82,7 @@ include __DIR__ . '/../includes/head.php';
     <div class="card-header"><h2>💳 Recent Razorpay Transactions</h2><span style="margin-left:auto;font-size:12px;color:var(--text-muted)">Live gateway activity — auto-verified, no manual approval needed</span></div>
     <div class="table-wrapper">
       <table>
-        <thead><tr><th>Vendor</th><th>Purpose</th><th>Amount</th><th>Gateway Order ID</th><th>Gateway Payment ID</th><th>Status</th><th>Date</th></tr></thead>
+        <thead><tr><th>Vendor</th><th>Purpose</th><th>Amount</th><th>Gateway Order ID</th><th>Gateway Payment ID</th><th>Status</th><th>Date</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($gatewayTxns as $t): ?>
         <tr>
@@ -93,6 +93,7 @@ include __DIR__ . '/../includes/head.php';
           <td><code style="font-size:11px"><?= sanitize($t['gateway_payment_id'] ?: '—') ?></code></td>
           <td><?= statusBadge($t['status']==='paid'?'active':($t['status']==='failed'?'closed':'pending')) ?></td>
           <td style="font-size:12px;color:var(--text-muted)"><?= timeAgo($t['created_at']) ?></td>
+          <td><?php if ($t['invoice_id']): ?><a href="invoice.php?id=<?= $t['invoice_id'] ?>" target="_blank" class="btn btn-outline btn-xs">🧾</a><?php endif; ?></td>
         </tr>
         <?php endforeach; ?>
         </tbody>
