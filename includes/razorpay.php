@@ -74,6 +74,8 @@ function razorpayFetchPayment($paymentId) {
 // lives in exactly one place regardless of which path confirms it first.
 // Safe to call twice for the same transaction (idempotent via status check).
 // ------------------------------------------------------------------
+require_once __DIR__ . '/invoice.php';
+
 function fulfillPaymentTransaction($pdo, $txn, $paymentId, $signature) {
     if ($txn['status'] === 'paid') {
         return ['ok' => true, 'already' => true]; // already processed (e.g. webhook beat the browser callback)
@@ -96,6 +98,12 @@ function fulfillPaymentTransaction($pdo, $txn, $paymentId, $signature) {
             ->execute([$vendorId, $planId, $cycle, $expires]);
         $pdo->prepare("INSERT INTO subscription_payments (vendor_id,plan_id,amount,billing_cycle,status,paid_at) VALUES(?,?,?,?,'paid',NOW())")
             ->execute([$vendorId, $planId, $txn['amount'], $cycle]);
+        $subPaymentId = (int)$pdo->lastInsertId();
+
+        $planName = $pdo->prepare("SELECT name FROM subscription_plans WHERE id=?");
+        $planName->execute([$planId]); $planName = $planName->fetchColumn() ?: 'Subscription';
+        createInvoice($pdo, 'subscription', $vendorId, $subPaymentId, $txn['id'], $txn['amount'],
+            $planName . ' Plan — ' . ucfirst($cycle) . ' Subscription', $paymentId);
     }
 
     if ($txn['purpose'] === 'ad') {
@@ -105,6 +113,12 @@ function fulfillPaymentTransaction($pdo, $txn, $paymentId, $signature) {
 
         $pdo->prepare("INSERT INTO ad_payments (ad_id,vendor_id,package_id,amount,currency,payment_method,payment_ref,status) VALUES (?,?,?,?,'INR','razorpay',?,'paid')")
             ->execute([$adId, $vendorId, $packageId, $txn['amount'], $paymentId]);
+        $adPaymentId = (int)$pdo->lastInsertId();
+
+        $pkgName = $pdo->prepare("SELECT name FROM ad_packages WHERE id=?");
+        $pkgName->execute([$packageId]); $pkgName = $pkgName->fetchColumn() ?: 'Banner Ad';
+        createInvoice($pdo, 'ad', $vendorId, $adPaymentId, $txn['id'], $txn['amount'],
+            'Banner Ad Booking — ' . $pkgName, $paymentId);
 
         // Auto-approve, but only if THIS SLOT still has room for these dates —
         // same rule that governs manual admin approval, applied automatically here.
