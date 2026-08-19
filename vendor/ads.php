@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $tab = $_GET['tab'] ?? 'my-ads';
 $packages = $pdo->query("SELECT * FROM ad_packages WHERE is_active=1 ORDER BY sort_order,price")->fetchAll();
 $slots    = $pdo->query("SELECT * FROM ad_slots WHERE is_active=1 ORDER BY sort_order,start_time")->fetchAll();
-$myAds    = $pdo->prepare("SELECT ba.*,p.name AS package_name,p.duration_days,p.price AS package_price,s.name AS slot_name,s.start_time,s.end_time,(SELECT status FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_status,(SELECT payment_ref FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_ref,(SELECT id FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_id FROM banner_ads ba JOIN ad_packages p ON p.id=ba.package_id JOIN ad_slots s ON s.id=ba.slot_id WHERE ba.vendor_id=? ORDER BY ba.created_at DESC");
+$myAds    = $pdo->prepare("SELECT ba.*,p.name AS package_name,p.duration_days,p.price AS package_price,s.name AS slot_name,s.start_time,s.end_time,(SELECT status FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_status,(SELECT payment_ref FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_ref,(SELECT id FROM ad_payments WHERE ad_id=ba.id ORDER BY created_at DESC LIMIT 1) AS pay_id,(SELECT i.id FROM invoices i JOIN ad_payments ap2 ON ap2.id=i.reference_id AND i.type='ad' WHERE ap2.ad_id=ba.id AND ap2.status='paid' ORDER BY i.id DESC LIMIT 1) AS invoice_id FROM banner_ads ba JOIN ad_packages p ON p.id=ba.package_id JOIN ad_slots s ON s.id=ba.slot_id WHERE ba.vendor_id=? ORDER BY ba.created_at DESC");
 $myAds->execute([$uid]); $myAds=$myAds->fetchAll();
 
 $pageTitle='Banner Ads'; $activePage='ads';
@@ -408,6 +408,9 @@ function payForAd(btn){
           <?php if (($ad['pay_status']??'pending')==='pending'): ?>
           <button class="btn btn-primary btn-sm" data-ad-id="<?=$ad['id']?>" onclick="payForAd(this)">💳 Pay Online</button>
           <button class="btn btn-outline btn-xs" onclick="openPayRefModal(<?=$ad['id']?>,<?=$ad['pay_id']?:0?>,<?=$ad['package_price']?>,'<?=addslashes($ad['package_name'])?>')">Bank Transfer Instead</button>
+          <?php endif; ?>
+          <?php if ($ad['pay_status']==='paid' && $ad['invoice_id']): ?>
+          <a href="invoice.php?id=<?=$ad['invoice_id']?>" target="_blank" class="btn btn-outline btn-xs">🧾 Invoice</a>
           <?php endif; ?>
           <?php if(in_array($sc,['pending','approved'])): ?>
           <form method="POST" onsubmit="return confirm('Cancel this booking?')">
