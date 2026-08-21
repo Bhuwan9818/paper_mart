@@ -29,6 +29,33 @@ define('RAZORPAY_KEY_SECRET', 'rHvpkoCypuRpaj6VwagCCgRc');
 // From Dashboard → Settings → Webhooks, after you create a webhook (see setup guide).
 define('RAZORPAY_WEBHOOK_SECRET', 'YOUR_WEBHOOK_SECRET_HERE');
 
+// ---- Automated database backups ----
+// Random secret used to authorize the cron-triggered backup URL (see
+// cron-backup.php and admin/backup.php for setup instructions). Change this
+// to your own random string before going live.
+define('BACKUP_CRON_SECRET', 'change-this-to-a-random-string-abc123xyz');
+
+// ---- Outgoing email (enquiry notifications via Gmail SMTP) ----
+// Use a Gmail App Password, NOT your normal Gmail password — Gmail blocks
+// plain password SMTP login. See the setup guide for how to generate one.
+define('SMTP_HOST',       'smtp.gmail.com');
+define('SMTP_PORT',       587);
+define('SMTP_USERNAME',   'bhuwansingh8860@gmail.com');   // the Gmail account emails are sent FROM
+define('SMTP_PASSWORD',   'metu ghcw azds jvip'); // Gmail App Password (no spaces)
+define('SMTP_FROM_EMAIL', 'bhuwansingh9818@gmail.com');
+define('SMTP_FROM_NAME',  'PaperMart');
+// Every enquiry is also emailed here in addition to the vendor. Can be a
+// separate admin inbox or the same Gmail account above.
+define('ADMIN_NOTIFY_EMAIL', 'admin@example.com');
+
+// ---- Platform billing identity (shown as the "seller" on every invoice) ----
+// Update these with your actual registered business details before going live.
+define('PLATFORM_LEGAL_NAME',    'PaperKart');
+define('PLATFORM_ADDRESS',       'punjabi bagh, Delhi, Delhi, 110084');
+define('PLATFORM_GSTIN',         '');   // leave blank to hide GSTIN line on invoices
+define('PLATFORM_SUPPORT_EMAIL', SMTP_FROM_EMAIL);
+define('INVOICE_PREFIX',         'INV');
+
 // Connect via PDO
 try {
     $pdo = new PDO(
@@ -47,3 +74,6 @@ try {
         Please check your <code>config.php</code> settings and make sure MySQL is running.
     </div>');
 }
+
+// require_once __DIR__ . '/includes/audit_log.php';
+require_once __DIR__ . '/includes/invoice.php';

@@ -46,7 +46,7 @@ $monthRevenue = (int)$pdo->query("SELECT COALESCE(SUM(amount),0) FROM invoices W
 $pageTitle = 'Invoices'; $activePage = 'invoices';
 include __DIR__ . '/../includes/head.php';
 ?>
-<?php renderTopbar('Invoices', '<a href="?export=csv" class="btn btn-outline btn-sm">📥 Export CSV</a>'); ?>
+<?php // renderTopbar('Invoices', '<a href="?export=csv" class="btn btn-outline btn-sm">📥 Export CSV</a>'); ?>
 <div class="content">
     <?= showFlash() ?>
     <div class="page-header">

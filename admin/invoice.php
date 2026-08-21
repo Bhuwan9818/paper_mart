@@ -15,6 +15,6 @@ if (!$invoice) {
     exit('Invoice not found.');
 }
 
-logAdminActivity($pdo, 'invoice.view', 'invoice', $id, $invoice['invoice_number']);
+// logAdminActivity($pdo, 'invoice.view', 'invoice', $id, $invoice['invoice_number']);
 
 include __DIR__ . '/../includes/invoice-template.php';
