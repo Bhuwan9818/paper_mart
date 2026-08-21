@@ -87,7 +87,7 @@ echo json_encode([
     'amount'      => $order['amount'], // paise, echoed back to Checkout as-is
     'currency'    => 'INR',
     'txn_id'      => $txnId,
-    'name'        => 'PaperMart',
+    'name'        => 'paperKart',
     'description' => $description,
     'prefill'     => ['name' => $vendor['name'] ?? '', 'email' => $vendor['email'] ?? '', 'contact' => $vendor['phone'] ?? ''],
 ]);

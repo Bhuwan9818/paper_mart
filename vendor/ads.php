@@ -530,9 +530,9 @@ function payForAd(btn){
             <div class="payment-amount" id="pay-amount">Select a package above</div>
             <div class="bank-details">
               <strong>Bank Transfer / UPI</strong><br>
-              Company: PaperMart India Pvt Ltd<br>
+              Company: paperKart India Pvt Ltd<br>
               Bank: HDFC Bank &nbsp;|&nbsp; IFSC: HDFC0001234<br>
-              A/C: 5010 0123 4567 &nbsp;|&nbsp; UPI: papermart@hdfcbank
+              A/C: 5010 0123 4567 &nbsp;|&nbsp; UPI: paperKart@hdfcbank
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label" style="font-size:13px">Transaction / UTR Reference <span style="font-size:11px;color:var(--text-muted)">(optional now, required to activate)</span></label>

@@ -1,6 +1,6 @@
 -- ============================================================
 -- AI Chatbot + Enquiry Assistant — Database Migration
--- PaperMart (product_enquiry database)
+-- paperKart (product_enquiry database)
 -- Run AFTER your existing database.sql
 -- ============================================================
 

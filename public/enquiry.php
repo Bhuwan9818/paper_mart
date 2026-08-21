@@ -1,5 +1,5 @@
 <?php
-$pageTitle='Send Enquiry — PaperMart'; $currentPage='enquiry';
+$pageTitle='Send Enquiry — paperKart'; $currentPage='enquiry';
 include __DIR__.'/includes/header.php';
 include __DIR__.'/includes/chatbot-widget.php';
 

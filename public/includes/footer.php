@@ -20,7 +20,7 @@
           <div class="logo">
             <div class="logo-icon">📄</div>
             <div>
-              <div class="logo-text">PaperMart</div>
+              <div class="logo-text">paperKart</div>
               <div class="logo-sub">B2B Paper Marketplace</div>
             </div>
           </div>
@@ -62,7 +62,7 @@
       </div>
     </div>
     <div class="footer-bottom">
-      <span>© 2024 PaperMart India. All rights reserved.</span>
+      <span>© 2024 paperKart India. All rights reserved.</span>
       <div class="footer-links">
         <a href="#">Privacy</a><a href="#">Terms</a><a href="#">Sitemap</a>
       </div>

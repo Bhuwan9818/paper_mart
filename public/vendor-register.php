@@ -7,7 +7,7 @@ require_once __DIR__.'/includes/site_functions.php';
 
 if (isLoggedIn()) { header('Location: '.BASE_URL.'/vendor/dashboard.php'); exit; }
 
-$pageTitle='Become a Vendor — PaperMart'; $currentPage='';
+$pageTitle='Become a Vendor — paperKart'; $currentPage='';
 $error=''; $success='';
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 if ($freePlan) $pdo->prepare("INSERT INTO vendor_subscriptions (vendor_id,plan_id,status,started_at,expires_at,trial_ends_at) VALUES(?,?,'trial',NOW(),DATE_ADD(NOW(),INTERVAL 14 DAY),DATE_ADD(NOW(),INTERVAL 14 DAY))")->execute([$uid,$freePlan]);
             }catch(Exception $e){}
             // Welcome notification
-            try { $pdo->prepare("INSERT INTO notifications (user_id,title,message,link) VALUES(?,?,?,?)")->execute([$uid,'Welcome to PaperMart! 🎉','Your vendor account is ready. Start by adding your first product.',BASE_URL.'/vendor/add-product.php']); }catch(Exception $e){}
+            try { $pdo->prepare("INSERT INTO notifications (user_id,title,message,link) VALUES(?,?,?,?)")->execute([$uid,'Welcome to paperKart! 🎉','Your vendor account is ready. Start by adding your first product.',BASE_URL.'/vendor/add-product.php']); }catch(Exception $e){}
             // Auto login
             $_SESSION['user_id']=$uid; $_SESSION['name']=$name; $_SESSION['email']=$email; $_SESSION['role']='vendor';
             header('Location:'.BASE_URL.'/vendor/dashboard.php'); exit;
@@ -51,7 +51,7 @@ include __DIR__.'/includes/header.php';
   <div class="container" style="max-width:580px">
     <div class="section-head center" style="margin-bottom:28px">
       <div class="section-label">Join Free</div>
-      <h1 style="font-size:28px">Become a Vendor on PaperMart</h1>
+      <h1 style="font-size:28px">Become a Vendor on paperKart</h1>
       <p>List your products for free and reach thousands of B2B buyers across India.</p>
     </div>
     <?php if($error): ?><div class="site-alert site-alert-error"><span>⚠️</span><span><?= $error ?></span></div><?php endif; ?>

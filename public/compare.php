@@ -1,5 +1,5 @@
 <?php
-$pageTitle   = 'Compare Products — PaperMart';
+$pageTitle   = 'Compare Products — paperKart';
 $currentPage = 'compare';
 include __DIR__.'/includes/header.php';
 

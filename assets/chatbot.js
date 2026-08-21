@@ -1,5 +1,5 @@
 /**
- * PaperMart Free Chatbot Widget
+ * paperKart Free Chatbot Widget
  * File: /assets/chatbot.js
  * No dependencies — pure vanilla JavaScript
  * 
@@ -26,14 +26,14 @@
     'Subscription plans',
     'How to send enquiry?',
     'Login / Password reset',
-    'About PaperMart',
+    'About paperKart',
     'Payment methods',
     'Shipping & delivery',
     'Cancel subscription',
   ];
 
   // ── Greeting message ───────────────────────────────────────
-  const GREETING = `<p>👋 <strong>Hello! Welcome to PaperMart.</strong></p>
+  const GREETING = `<p>👋 <strong>Hello! Welcome to paperKart.</strong></p>
 <p>I'm your virtual assistant — powered by smart intent matching, not an AI API!</p>
 <p>I can help you with vendor registration, enquiries, subscriptions, and more.</p>`;
   const GREETING_CHIPS = ['How to become a vendor?','Send an enquiry','Subscription plans','Login help'];
@@ -54,7 +54,7 @@
     el.id = 'pmbot';
     el.innerHTML = `
       <!-- Trigger button -->
-      <button id="pmbot-btn" aria-label="Open PaperMart Chat Assistant" title="Chat with us">
+      <button id="pmbot-btn" aria-label="Open paperKart Chat Assistant" title="Chat with us">
         <svg class="ic-chat" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
@@ -65,7 +65,7 @@
       </button>
 
       <!-- Chat window -->
-      <div id="pmbot-window" role="dialog" aria-label="PaperMart Chat Assistant">
+      <div id="pmbot-window" role="dialog" aria-label="paperKart Chat Assistant">
 
         <!-- Header -->
         <div id="pmbot-header">
@@ -73,7 +73,7 @@
             🤖<span class="pmbot-online-dot"></span>
           </div>
           <div class="pmbot-hd-info">
-            <div class="pmbot-hd-name">PaperMart Assistant</div>
+            <div class="pmbot-hd-name">paperKart Assistant</div>
             <div class="pmbot-hd-sub">Online · Replies instantly</div>
           </div>
           <div class="pmbot-hd-btns">

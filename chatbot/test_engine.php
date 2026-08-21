@@ -27,7 +27,7 @@ $OK   = '✅';
 $FAIL = '❌';
 $WARN = '⚠️ ';
 
-echo "PaperMart Free Chatbot — Engine Test\n";
+echo "paperKart Free Chatbot — Engine Test\n";
 echo str_repeat('─', 55) . "\n\n";
 
 // ── 1. DB Tables exist ────────────────────────────────────
@@ -64,7 +64,7 @@ $testCases = [
     ['cant login to my account',   'login_help',           'Login problem'],
     ['i need to talk to someone',  'contact_support',      'Human escalation'],
     ['how do i send a product enquiry', 'enquiry_process', 'Enquiry process'],
-    ['tell me about papermart',    'platform_info',        'Platform info'],
+    ['tell me about paperKart',    'platform_info',        'Platform info'],
     ['shipping and delivery',      'shipping_delivery',    'Shipping intent'],
     ['how to pay for subscription','payment_info',         'Payment info'],
     ['cancel my plan',             'cancellation_refund',  'Cancellation intent'],

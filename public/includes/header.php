@@ -6,7 +6,7 @@ require_once dirname(__DIR__,2).'/includes/auth.php';
 require_once dirname(__DIR__,2).'/includes/functions.php';
 require_once __DIR__.'/site_functions.php';
 
-$pageTitle   = $pageTitle ?? 'PaperMart — India\'s B2B Paper Marketplace';
+$pageTitle   = $pageTitle ?? 'paperKart — India\'s B2B Paper Marketplace';
 $pageDesc    = $pageDesc  ?? 'Find kraft paper, corrugated boxes, duplex board and more from verified Indian manufacturers.';
 $currentPage = $currentPage ?? '';
 
@@ -54,7 +54,7 @@ $searchQ    = sH($_GET['q'] ?? '');
     <a href="<?= BASE_URL ?>/public/index.php" class="logo" onclick="closeMobMenu()">
       <div class="logo-icon">📄</div>
       <div>
-        <div class="logo-text">PaperMart</div>
+        <div class="logo-text">paperKart</div>
         <div class="logo-sub">B2B Paper Marketplace</div>
       </div>
     </a>
@@ -150,7 +150,7 @@ $searchQ    = sH($_GET['q'] ?? '');
   <div class="mob-drawer-foot">
     <div class="mob-contact-items">
       <a href="tel:+919876543210"><span>📞</span> +91 98765 43210</a>
-      <a href="mailto:info@papermart.in"><span>✉️</span> info@papermart.in</a>
+      <a href="mailto:info@paperKart.in"><span>✉️</span> info@paperKart.in</a>
     </div>
   </div>
 </div>
@@ -186,7 +186,7 @@ $searchQ    = sH($_GET['q'] ?? '');
     <div class="container">
       <div class="header-top-left">
         <span>📞 +91 98765 43210</span>
-        <span>✉️ info@papermart.in</span>
+        <span>✉️ info@paperKart.in</span>
         <span>🕐 Mon–Sat, 9AM–6PM</span>
       </div>
       <div class="header-top-right">
@@ -215,7 +215,7 @@ $searchQ    = sH($_GET['q'] ?? '');
       <a href="<?= BASE_URL ?>/public/index.php" class="logo">
         <div class="logo-icon">📄</div>
         <div>
-          <div class="logo-text">PaperMart</div>
+          <div class="logo-text">paperKart</div>
           <div class="logo-sub">B2B Paper Marketplace</div>
         </div>
       </a>

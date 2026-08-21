@@ -24,7 +24,7 @@ $typeLabel   = $invoice['type'] === 'subscription' ? 'Subscription' : 'Advertisi
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Invoice <?= htmlspecialchars($invoice['invoice_number']) ?> — PaperMart</title>
+<title>Invoice <?= htmlspecialchars($invoice['invoice_number']) ?> — paperKart</title>
 <style>
   :root{ --brand:#8b241d; --brand-2:#6b1a14; --gold:#f0c060; --n900:#1f2937; --n500:#6b7280; --n200:#e5e7eb; --n50:#f9fafb; }
   *{box-sizing:border-box}

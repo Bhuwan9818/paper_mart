@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>PaperMart — Launching Soon</title>
+<title>paperKart — Launching Soon</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -56,9 +56,9 @@
     <div class="diamond">&#9670;</div>
     <h1>Something Great Is Coming</h1>
     <div class="divider"></div>
-    <p class="sub">PaperMart — a new B2B marketplace connecting paper and packaging buyers directly with verified mills and vendors — is currently being built. We'll be live shortly.</p>
+    <p class="sub">paperKart — a new B2B marketplace connecting paper and packaging buyers directly with verified mills and vendors — is currently being built. We'll be live shortly.</p>
     <div class="badge"><span class="dot"></span> Launching Soon</div>
-    <footer>&copy; <?= date('Y') ?> PaperMart. All rights reserved.</footer>
+    <footer>&copy; <?= date('Y') ?> paperKart. All rights reserved.</footer>
   </div>
 </body>
 </html>

@@ -546,7 +546,7 @@ function buildPTCard(pt,num){
         <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">📦 Product Details</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
           <div><div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px">Brand Name</div>
-            <input type="text" class="form-control" style="font-size:13px;padding:7px 10px" placeholder="e.g. PaperMart" value="${esc(s.brand)}" oninput="ptState[${pt.id}].brand=this.value"></div>
+            <input type="text" class="form-control" style="font-size:13px;padding:7px 10px" placeholder="e.g. paperKart" value="${esc(s.brand)}" oninput="ptState[${pt.id}].brand=this.value"></div>
           <div><div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px">Min. Order Quantity</div>
             <input type="text" class="form-control" style="font-size:13px;padding:7px 10px" placeholder="e.g. 500 kg" value="${esc(s.moq)}" oninput="ptState[${pt.id}].moq=this.value"></div>
           <div><div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px">Machine Count</div>

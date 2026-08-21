@@ -62,7 +62,7 @@ define('SMTP_PORT',       587);
 define('SMTP_USERNAME',   'bhuwansingh8860@gmail.com');   // the Gmail account emails are sent FROM
 define('SMTP_PASSWORD',   'metu ghcw azds jvip'); // Gmail App Password (no spaces)
 define('SMTP_FROM_EMAIL', 'bhuwansingh9818@gmail.com');
-define('SMTP_FROM_NAME',  'PaperMart');
+define('SMTP_FROM_NAME',  'paperKart');
 // Every enquiry is also emailed here in addition to the vendor. Can be a
 // separate admin inbox or the same Gmail account above.
 define('ADMIN_NOTIFY_EMAIL', 'admin@example.com');

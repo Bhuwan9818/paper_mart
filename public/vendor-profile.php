@@ -7,7 +7,7 @@ $stmt->execute([$vid]); $vendor=$stmt->fetch();
 if(!$vendor){header('Location:'.BASE_URL.'/public/vendors.php');exit;}
 $prods=$pdo->prepare("SELECT p.*,c.name AS cname FROM products p JOIN categories c ON c.id=p.category_id WHERE p.vendor_id=? AND p.status='active' ORDER BY p.is_featured DESC,p.views DESC LIMIT 20");
 $prods->execute([$vid]); $products=$prods->fetchAll();
-$pageTitle=sH($vendor['company']?:$vendor['name']).' — PaperMart';
+$pageTitle=sH($vendor['company']?:$vendor['name']).' — paperKart';
 ?>
 <div style="background:var(--brand);padding:32px 0;color:#fff">
   <div class="container">

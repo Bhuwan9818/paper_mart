@@ -1,5 +1,5 @@
 <?php
-$pageTitle   = 'Browse Products — PaperMart';
+$pageTitle   = 'Browse Products — paperKart';
 $currentPage = 'products';
 include __DIR__.'/includes/header.php';
 require_once __DIR__.'/../includes/search_engine.php';
@@ -81,7 +81,7 @@ elseif($vendorId){ $vn=$pdo->prepare("SELECT COALESCE(company,name) FROM users W
 elseif($country){ $heading = 'Products from ' . sH($country); }
 $selectedVendorName = null;
 if ($vendorId) { $sv=$pdo->prepare("SELECT COALESCE(company,name) FROM users WHERE id=?"); $sv->execute([$vendorId]); $selectedVendorName = $sv->fetchColumn(); }
-$pageTitle = "$heading — PaperMart";
+$pageTitle = "$heading — paperKart";
 ?>
 
 <div style="background:var(--n50);padding:14px 0;border-bottom:1px solid var(--n200)">

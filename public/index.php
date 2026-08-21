@@ -1,5 +1,5 @@
 <?php
-$pageTitle   = 'PaperMart — India\'s #1 B2B Paper & Packaging Marketplace';
+$pageTitle   = 'paperKart — India\'s #1 B2B Paper & Packaging Marketplace';
 $pageDesc    = 'Source kraft paper, corrugated boxes, duplex board and packaging materials from verified manufacturers across India.';
 $currentPage = 'home';
 include __DIR__.'/includes/header.php';
@@ -796,7 +796,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   <div class="container">
     <div class="section-head center">
       <div class="section-label">Simple Process</div>
-      <h2>How PaperMart Works</h2>
+      <h2>How paperKart Works</h2>
       <p>Connect with verified manufacturers in 3 easy steps — completely free for buyers.</p>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:36px" class="compare-group">

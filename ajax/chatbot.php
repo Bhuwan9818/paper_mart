@@ -22,7 +22,7 @@ $ip     = cbGetClientIp();
 
 // ── Rate limit ─────────────────────────────────────────────
 if (cbIsRateLimited($pdo, $ip)) {
-    cbJsonOut(['error'=>true,'reply'=>'You\'ve sent too many messages today. Please try again tomorrow or email admin@papermart.in.','type'=>'rate_limit'], 429);
+    cbJsonOut(['error'=>true,'reply'=>'You\'ve sent too many messages today. Please try again tomorrow or email admin@paperKart.in.','type'=>'rate_limit'], 429);
 }
 
 // ── Get/create session ─────────────────────────────────────

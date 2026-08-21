@@ -25,7 +25,7 @@ if (!defined('BASE_URL')) {
     return;
 }
 ?>
-<!-- ═══ PaperMart Chatbot Widget ═══════════════════════════ -->
+<!-- ═══ paperKart Chatbot Widget ═══════════════════════════ -->
 <script>window.PM_BASE_URL = '<?= rtrim(BASE_URL, '/') ?>';</script>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/chatbot.css">
 <script src="<?= BASE_URL ?>/assets/chatbot.js" defer></script>

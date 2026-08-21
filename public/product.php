@@ -27,7 +27,7 @@ $related->execute([$p['category_id'],$p['id']]); $relatedProds=$related->fetchAl
 
 $imgs=array_values(array_filter(array_map('trim',explode(',',$p['images']??''))));
 $mainImg=$imgs?UPLOAD_URL.$imgs[0]:'';
-$pageTitle=sH($p['name']).' — PaperMart';
+$pageTitle=sH($p['name']).' — paperKart';
 // Prepare attribute lists: hide technical files (TDS) from specs/overview
 $visibleAttrList = array_values(array_filter($attrList, function($a){
   $name = strtolower(trim($a['attribute_name'] ?? ''));

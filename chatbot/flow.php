@@ -153,7 +153,7 @@ function handleTicketFlow(PDO $pdo, int $sid, int $step, array $ctx, string $inp
 
             } catch(Exception $e) {
                 updateSessionContext($pdo, $sid, ['current_intent'=>null,'current_step'=>0]);
-                return ['reply'=>"Sorry, could not create ticket. Please email <a href='mailto:admin@papermart.in'>admin@papermart.in</a> directly."];
+                return ['reply'=>"Sorry, could not create ticket. Please email <a href='mailto:admin@paperKart.in'>admin@paperKart.in</a> directly."];
             }
 
             return [
