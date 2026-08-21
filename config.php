@@ -16,6 +16,25 @@ define('BASE_URL', '/dashv10_Fixed');
 define('UPLOAD_DIR', __DIR__ . '/assets/uploads/');
 define('UPLOAD_URL', BASE_URL . '/assets/uploads/');
 
+// ---- Site-wide launch gate ("Coming Soon" mode) ----
+// While true, every page on the entire site shows a public "Coming Soon"
+// message instead of its normal content — EXCEPT for people who've entered
+// the gate credentials below at site-access.php, whose access then persists
+// for 90 days via a browser cookie. This is a lightweight, temporary gate
+// for a pre-launch period — NOT a replacement for the real vendor/admin/
+// customer login system underneath it, which still applies as normal once
+// someone is through this outer gate.
+//
+// When you're ready to go fully public, just change this to false — no
+// other code changes needed anywhere.
+define('SITE_LAUNCH_MODE', true);
+define('SITE_GATE_USERNAME', 'superadmin');
+define('SITE_GATE_PASSWORD', 'superadmin');       // change before sharing the URL
+define('SITE_GATE_COOKIE_SECRET', 'change-this-to-a-long-random-string-before-launch');
+
+require_once __DIR__ . '/includes/site_gate.php';
+enforceSiteGate();
+
 // Hard cap on how many vendor ad banners can be pending/approved/running
 // at once for any overlapping date range — keeps the homepage hero to a
 // maximum of this many rotating banners at any given time.
