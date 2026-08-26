@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="card">
     <div class="logo">
       <h1>&#9670; paperKart</h1>
-      <p>Private Preview — Not Yet Publicly Launched</p>
+      <!-- <p>Private Preview — Not Yet Publicly Launched</p> -->
     </div>
     <?php if ($error): ?><div class="alert">⚠️ <?= htmlspecialchars($error) ?></div><?php endif; ?>
     <form method="POST">

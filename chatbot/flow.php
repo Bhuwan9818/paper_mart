@@ -153,7 +153,7 @@ function handleTicketFlow(PDO $pdo, int $sid, int $step, array $ctx, string $inp
 
             } catch(Exception $e) {
                 updateSessionContext($pdo, $sid, ['current_intent'=>null,'current_step'=>0]);
-                return ['reply'=>"Sorry, could not create ticket. Please email <a href='mailto:admin@paperKart.in'>admin@paperKart.in</a> directly."];
+                return ['reply'=>"Sorry, could not create ticket. Please email <a href='mailto:admin@papermart.in'>admin@papermart.in</a> directly."];
             }
 
             return [
@@ -220,6 +220,12 @@ function handleEnquiryFlow(PDO $pdo, int $sid, int $step, array $ctx, string $in
                 $message = "Product: $product\nQty: $quantity\nCity: $city\n[Via Chatbot]";
                 $pdo->prepare("INSERT INTO web_enquiries (name,email,city,message,qty_needed,source,ip_address) VALUES(?,?,?,?,?,'chatbot',?)")
                     ->execute(['Chatbot Lead', $email, $city, $message, $quantity, $_SERVER['REMOTE_ADDR']??'']);
+                try {
+                    require_once __DIR__.'/../includes/mailer.php';
+                    notifyEnquiryByEmail($pdo, $pdo->lastInsertId());
+                } catch (Exception $e) {
+                    error_log('Chatbot enquiry email notification failed: ' . $e->getMessage());
+                }
             } catch(Exception $e) {} // table may not exist yet
 
             updateSessionContext($pdo, $sid, ['current_intent'=>null,'current_step'=>0,'user_email'=>$email,'context_data'=>[]]);
