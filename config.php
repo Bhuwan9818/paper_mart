@@ -10,7 +10,7 @@ define('DB_PASS', 'Bhuwan.9818');          // change if you have a password
 define('DB_NAME', 'u882673442_paperkart');
 
 // Base URL — change to match your setup
-define('BASE_URL', '/dashv10_Fixed');
+define('BASE_URL', '');
 
 // Upload directory (create this folder and give write permission)
 define('UPLOAD_DIR', __DIR__ . '/assets/uploads/');
