@@ -5,9 +5,9 @@
 // ============================================================
 
 define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');          // change if you have a password
-define('DB_NAME', 'product_enquiry');
+define('DB_USER', 'u882673442_paperkart');
+define('DB_PASS', 'Bhuwan.9818');          // change if you have a password
+define('DB_NAME', 'u882673442_paperkart');
 
 // Base URL — change to match your setup
 define('BASE_URL', '/dashv10_Fixed');
