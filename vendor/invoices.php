@@ -63,7 +63,7 @@ include __DIR__ . '/../includes/head.php';
                 <tr>
                     <td><code style="font-size:12.5px"><?= sanitize($inv['invoice_number']) ?></code></td>
                     <td><?= sanitize($inv['description']) ?></td>
-                    <td><span class="badge <?= $inv['type']==='subscription'?'badge-info':'badge-warning' ?>"><?= ucfirst($inv['type']) ?></span></td>
+                    <td><span class="badge <?= $inv['type']==='ad'?'badge-warning':'badge-info' ?>"><?= match($inv['type']){'subscription'=>'Subscription','customer_subscription'=>'Subscription','ad'=>'Advertising',default=>ucfirst($inv['type'])} ?></span></td>
                     <td style="font-weight:700">₹<?= number_format($inv['amount'],2) ?></td>
                     <td class="text-muted" style="font-size:12.5px"><?= date('d M Y', strtotime($inv['issued_at'])) ?></td>
                     <td><a href="invoice.php?id=<?= $inv['id'] ?>" target="_blank" class="btn btn-outline btn-xs">📄 View / Download</a></td>
