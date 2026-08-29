@@ -27,7 +27,7 @@ $related->execute([$p['category_id'],$p['id']]); $relatedProds=$related->fetchAl
 
 $imgs=array_values(array_filter(array_map('trim',explode(',',$p['images']??''))));
 $mainImg=$imgs?UPLOAD_URL.$imgs[0]:'';
-$pageTitle=sH($p['name']).' — paperKart';
+$pageTitle=sH($p['name']).' — PaperMart';
 // Prepare attribute lists: hide technical files (TDS) from specs/overview
 $visibleAttrList = array_values(array_filter($attrList, function($a){
   $name = strtolower(trim($a['attribute_name'] ?? ''));
@@ -43,6 +43,27 @@ foreach($attrList as $a){
   }
 }
 $tdsFiles = array_values(array_unique($tdsFiles));
+
+// Full-attribute access is a customer-plan feature: free-plan customers and
+// guests (not logged in) see a limited preview; paid customers (and any
+// non-customer role — vendor, admin, browsing their own catalog) see
+// everything. Guests are limited too, not just free customers, so that
+// simply logging out isn't a way around the plan limit.
+require_once __DIR__ . '/../includes/customer_subscription.php';
+$customerFullAttrs = true;
+$attrPreviewLimit = 5;
+if (!isset($_SESSION['role']) || $_SESSION['role'] === 'customer') {
+    $customerFullAttrs = false;
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'customer') {
+        $custSub = getCustomerSubscription($pdo, $_SESSION['user_id']);
+        $customerFullAttrs = $custSub ? customerHasFullAttributes($custSub) : false;
+    }
+}
+$attrLockedCount = 0;
+if (!$customerFullAttrs && count($visibleAttrList) > $attrPreviewLimit) {
+    $attrLockedCount = count($visibleAttrList) - $attrPreviewLimit;
+    $visibleAttrList = array_slice($visibleAttrList, 0, $attrPreviewLimit);
+}
 ?>
 
 <!-- Breadcrumb -->
@@ -115,11 +136,11 @@ $tdsFiles = array_values(array_unique($tdsFiles));
             <?php if($tdsFiles): ?>
             <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
               <div style="font-size:13px;color:var(--n500);font-weight:600">TDS:</div>
-              <?php foreach($tdsFiles as $tf): $f=basename($tf); $fpath=__DIR__.'/../assets/tds/'.$f; $furl=BASE_URL.'/assets/tds/'.$f; if(!file_exists($fpath)) continue; ?>
+              <?php foreach($tdsFiles as $tf): $f=basename($tf); $fpath=__DIR__.'/../assets/tds/'.$f; if(!file_exists($fpath)) continue; $furl=BASE_URL.'/public/download-tds.php?file='.urlencode($f); ?>
                 <div style="display:inline-flex;align-items:center;gap:15px;padding:6px 10px;border-radius:999px;background:#f8fafc;border:1px solid var(--n200)">
                   <span style="font-size:13px;font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= sH($f) ?></span>
-                  <a class="btn btn-outline btn-sm" href="<?= sH($furl) ?>" target="_blank" style="padding:6px 8px">View</a>
-                  <a class="btn btn-accent btn-sm" href="<?= sH($furl) ?>" download style="padding:6px 8px">Download</a>
+                  <a class="btn btn-outline btn-sm" href="<?= sH($furl) ?>&mode=view" target="_blank" style="padding:6px 8px">View</a>
+                  <a class="btn btn-accent btn-sm" href="<?= sH($furl) ?>" style="padding:6px 8px">Download</a>
                 </div>
               <?php endforeach; ?>
             </div>
@@ -141,6 +162,20 @@ $tdsFiles = array_values(array_unique($tdsFiles));
               <?php endforeach; ?>
               </tbody>
             </table>
+            <?php if ($attrLockedCount > 0): ?>
+            <div style="margin-top:14px;padding:16px 18px;background:#fff8e6;border:1px solid #f0d896;border-radius:10px;text-align:center">
+              <div style="font-size:13.5px;color:#7a5c00;margin-bottom:10px">🔒 <?= $attrLockedCount ?> more specification<?= $attrLockedCount>1?'s':'' ?> hidden.
+                <?php if (isset($_SESSION['role']) && $_SESSION['role']==='customer'): ?>
+                  Upgrade to Premium to see full specifications.
+                <?php else: ?>
+                  Log in as a customer and upgrade to Premium to see full specifications.
+                <?php endif; ?>
+              </div>
+              <a href="<?= BASE_URL ?>/<?= (isset($_SESSION['role']) && $_SESSION['role']==='customer') ? 'customer/subscription.php' : 'login.php' ?>" class="btn btn-primary btn-sm">
+                <?= (isset($_SESSION['role']) && $_SESSION['role']==='customer') ? 'Upgrade to Premium' : 'Log In' ?>
+              </a>
+            </div>
+            <?php endif; ?>
             <?php else: ?><p style="color:var(--n500)">No specifications listed for this product.</p><?php endif; ?>
           </div>
 
@@ -181,7 +216,7 @@ $tdsFiles = array_values(array_unique($tdsFiles));
                     <div style="padding:10px;border-radius:8px;background:#fff;border:1px dashed var(--n200);color:var(--n500)">No reports available for this product.</div>
                   <?php else: ?>
                     <div style="display:flex;flex-direction:column;gap:10px">
-                      <?php foreach($tdsFiles as $f): $file = basename($f); $fpath=__DIR__.'/../assets/tds/'.$file; $furl=BASE_URL.'/assets/tds/'.$file; if(!file_exists($fpath)) continue; $fs=filesize($fpath); if($fs>1024*1024) $fsize=round($fs/1024/1024,2).' MB'; elseif($fs>1024) $fsize=round($fs/1024,2).' KB'; else $fsize=$fs.' B'; ?>
+                      <?php foreach($tdsFiles as $f): $file = basename($f); $fpath=__DIR__.'/../assets/tds/'.$file; if(!file_exists($fpath)) continue; $furl=BASE_URL.'/public/download-tds.php?file='.urlencode($file); $fs=filesize($fpath); if($fs>1024*1024) $fsize=round($fs/1024/1024,2).' MB'; elseif($fs>1024) $fsize=round($fs/1024,2).' KB'; else $fsize=$fs.' B'; ?>
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border-radius:10px;background:#fff;border:1px solid var(--n200)">
                           <div style="display:flex;gap:10px;align-items:center;min-width:0">
                             <div style="width:44px;height:44px;border-radius:8px;background:#eef2ff;color:#1e40af;display:flex;align-items:center;justify-content:center;font-weight:800">PDF</div>
@@ -191,8 +226,8 @@ $tdsFiles = array_values(array_unique($tdsFiles));
                             </div>
                           </div>
                           <div style="display:flex;gap:8px;flex-shrink:0">
-                            <a class="btn btn-outline btn-sm" href="<?= sH($furl) ?>" target="_blank">View</a>
-                            <a class="btn btn-accent btn-sm" href="<?= sH($furl) ?>" download>Download</a>
+                            <a class="btn btn-outline btn-sm" href="<?= sH($furl) ?>&mode=view" target="_blank">View</a>
+                            <a class="btn btn-accent btn-sm" href="<?= sH($furl) ?>">Download</a>
                           </div>
                         </div>
                       <?php endforeach; ?>
@@ -373,6 +408,7 @@ $tdsFiles = array_values(array_unique($tdsFiles));
   <div class="modal-body">
     <div id="enq-success" class="site-alert site-alert-success" style="display:none"></div>
     <form id="enq-form" onsubmit="submitEnquiry(event)">
+      <?php // honeypotField(); ?>
       <input type="hidden" id="enq-product-id" name="product_id"><input type="hidden" id="enq-vendor-id" name="vendor_id">
       <div id="enq-product-name" style="background:var(--n50);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:16px;font-weight:600;font-size:13.5px;color:var(--brand)"></div>
       <div class="form-row"><div class="form-group"><label class="form-label">Name *</label><input type="text" name="name" class="form-input" required></div><div class="form-group"><label class="form-label">Email *</label><input type="email" name="email" class="form-input" required></div></div>

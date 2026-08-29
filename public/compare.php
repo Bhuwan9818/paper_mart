@@ -1,5 +1,5 @@
 <?php
-$pageTitle   = 'Compare Products — paperKart';
+$pageTitle   = 'Compare Products — PaperMart';
 $currentPage = 'compare';
 include __DIR__.'/includes/header.php';
 
@@ -104,7 +104,7 @@ $industries = $pdo->query(
               <div style="font-size:12px;color:var(--n500);margin-bottom:4px"><?= sH($p['cname']) ?></div>
               <div style="font-size:12.5px;font-weight:600;color:var(--brand);margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:4px">🏭 <?= sH($p['company'] ?: $p['vname']) ?><?php if($p['is_verified']): ?><span title="Verified Vendor" style="color:var(--success,#16a34a)">✓</span><?php endif; ?></div>
               <?php foreach ($productTds[$p['id']] ?? [] as $tdsIdx => $tdsFile): ?>
-              <a href="<?= BASE_URL ?>/assets/tds/<?= sH($tdsFile) ?>" target="_blank" download
+              <a href="<?= BASE_URL ?>/public/download-tds.php?file=<?= urlencode($tdsFile) ?>" target="_blank"
                  class="btn btn-outline btn-sm btn-full" style="margin-bottom:6px;color:#9d174d;border-color:#f9a8d4">📄 Download TDS<?= count($productTds[$p['id']])>1 ? ' ('.($tdsIdx+1).')' : '' ?></a>
               <?php endforeach; ?>
               <button class="btn btn-accent btn-sm btn-full" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">📩 Enquire</button>
@@ -171,7 +171,7 @@ $industries = $pdo->query(
               <div style="display:flex;flex-direction:column;gap:6px">
                 <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" class="btn btn-primary btn-sm btn-full">View Details</a>
                 <?php foreach ($productTds[$p['id']] ?? [] as $tdsIdx => $tdsFile): ?>
-                <a href="<?= BASE_URL ?>/assets/tds/<?= sH($tdsFile) ?>" target="_blank" download
+                <a href="<?= BASE_URL ?>/public/download-tds.php?file=<?= urlencode($tdsFile) ?>" target="_blank"
                    class="btn btn-outline btn-sm btn-full" style="color:#9d174d;border-color:#f9a8d4">📄 Download TDS<?= count($productTds[$p['id']])>1 ? ' ('.($tdsIdx+1).')' : '' ?></a>
                 <?php endforeach; ?>
                 <button class="btn btn-accent btn-sm btn-full" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">📩 Enquire</button>

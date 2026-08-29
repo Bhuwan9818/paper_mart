@@ -295,7 +295,7 @@ include __DIR__.'/includes/footer.php';
     <div class="modal-body">
       <div id="enq-success" class="site-alert site-alert-success" style="display:none"></div>
       <form id="enq-form" onsubmit="submitEnquiry(event)">
-      <?php honeypotField(); ?>
+      <?php // honeypotField(); ?>
         <input type="hidden" id="enq-product-id" name="product_id">
         <input type="hidden" id="enq-vendor-id"  name="vendor_id">
         <div id="enq-product-name" style="background:var(--n50);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:16px;font-weight:600;font-size:13.5px;color:var(--brand)"></div>
