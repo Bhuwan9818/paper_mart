@@ -17,7 +17,10 @@ require_once __DIR__ . '/../includes/razorpay.php';
 ob_end_clean();
 header('Content-Type: application/json');
 
-if (!isLoggedIn() || $_SESSION['role'] !== 'vendor' || isTeamMemberSession()) {
+$isCustomer = isLoggedIn() && $_SESSION['role'] === 'customer';
+$isVendor   = isLoggedIn() && $_SESSION['role'] === 'vendor' && !isTeamMemberSession();
+
+if (!$isCustomer && !$isVendor) {
     echo json_encode(['ok' => false, 'msg' => 'Please log in again and retry.']); exit;
 }
 $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
@@ -25,7 +28,7 @@ if (!hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
     echo json_encode(['ok' => false, 'msg' => 'Invalid session, please reload and try again.']); exit;
 }
 
-$vendorId  = effectiveVendorId();
+$payerId   = $isCustomer ? $_SESSION['user_id'] : effectiveVendorId();
 $orderId   = $_POST['razorpay_order_id'] ?? '';
 $paymentId = $_POST['razorpay_payment_id'] ?? '';
 $signature = $_POST['razorpay_signature'] ?? '';
@@ -36,7 +39,7 @@ if (!$orderId || !$paymentId || !$signature || !$txnId) {
 }
 
 $txn = $pdo->prepare("SELECT * FROM payment_transactions WHERE id=? AND vendor_id=? AND gateway_order_id=?");
-$txn->execute([$txnId, $vendorId, $orderId]); $txn = $txn->fetch();
+$txn->execute([$txnId, $payerId, $orderId]); $txn = $txn->fetch();
 if (!$txn) { echo json_encode(['ok' => false, 'msg' => 'Transaction not found.']); exit; }
 
 if (!razorpayVerifySignature($orderId, $paymentId, $signature)) {
