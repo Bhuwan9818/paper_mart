@@ -77,6 +77,9 @@ $adminNav = [
 $customerNav = [
     ['icon'=>'⊞','label'=>'Dashboard',    'href'=>BASE_URL.'/customer/dashboard.php', 'page'=>'dashboard'],
     ['icon'=>'📩','label'=>'My Enquiries', 'href'=>BASE_URL.'/customer/enquiries.php', 'page'=>'enquiries'],
+    ['icon'=>'📊','label'=>'Analytics',    'href'=>BASE_URL.'/customer/analytics.php', 'page'=>'analytics'],
+    ['icon'=>'⭐','label'=>'Subscription', 'href'=>BASE_URL.'/customer/subscription.php', 'page'=>'subscription'],
+    ['icon'=>'🧾','label'=>'Invoices',     'href'=>BASE_URL.'/customer/invoices.php',  'page'=>'invoices'],
     ['icon'=>'👤','label'=>'My Profile',   'href'=>BASE_URL.'/customer/profile.php',   'page'=>'profile'],
 ];
 
