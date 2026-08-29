@@ -17,14 +17,18 @@ if (!isset($invoice)) { http_response_code(404); exit('Invoice not found.'); }
 
 $statusLabel = 'PAID'; // invoices are only ever created for successful payments
 $issuedDate  = date('d M Y', strtotime($invoice['issued_at']));
-$typeLabel   = $invoice['type'] === 'subscription' ? 'Subscription' : 'Advertising';
+$typeLabel   = match($invoice['type']) {
+    'subscription'          => 'Vendor Subscription',
+    'customer_subscription' => 'Customer Subscription',
+    default                 => 'Advertising',
+};
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Invoice <?= htmlspecialchars($invoice['invoice_number']) ?> — paperKart</title>
+<title>Invoice <?= htmlspecialchars($invoice['invoice_number']) ?> — PaperMart</title>
 <style>
   :root{ --brand:#8b241d; --brand-2:#6b1a14; --gold:#f0c060; --n900:#1f2937; --n500:#6b7280; --n200:#e5e7eb; --n50:#f9fafb; }
   *{box-sizing:border-box}
