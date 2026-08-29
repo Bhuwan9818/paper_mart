@@ -17,6 +17,47 @@ require_once __DIR__ . '/../includes/razorpay.php';
 ob_end_clean();
 header('Content-Type: application/json');
 
+$purpose  = $_POST['purpose'] ?? '';
+
+// Customer subscription purchases are a separate, simpler path — no vendor
+// team-member/ownership concept applies to customer accounts.
+if ($purpose === 'customer_subscription') {
+    if (!isLoggedIn() || $_SESSION['role'] !== 'customer') {
+        echo json_encode(['ok' => false, 'msg' => 'Please log in as a customer to upgrade your plan.']); exit;
+    }
+    $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+        echo json_encode(['ok' => false, 'msg' => 'Invalid session, please reload and try again.']); exit;
+    }
+    $customerId = $_SESSION['user_id'];
+    $planId = (int)($_POST['plan_id'] ?? 0);
+    $cycle  = ($_POST['billing_cycle'] ?? 'monthly') === 'yearly' ? 'yearly' : 'monthly';
+
+    $plan = $pdo->prepare("SELECT * FROM customer_plans WHERE id=? AND is_active=1");
+    $plan->execute([$planId]); $plan = $plan->fetch();
+    if (!$plan) { echo json_encode(['ok' => false, 'msg' => 'Plan not found.']); exit; }
+
+    $amount = (float)($cycle === 'yearly' ? $plan['price_yearly'] : $plan['price_monthly']);
+    if ($amount <= 0) { echo json_encode(['ok' => false, 'msg' => 'This plan is free — no payment needed.']); exit; }
+
+    $receipt = 'CUSTSUB_' . $planId . '_' . time();
+    $order = razorpayCreateOrder($amount, $receipt, ['customer_id' => $customerId, 'purpose' => $purpose]);
+    if (!$order || empty($order['id'])) { echo json_encode(['ok' => false, 'msg' => 'Could not start payment. Please try again in a moment.']); exit; }
+
+    $pdo->prepare("INSERT INTO payment_transactions (vendor_id,purpose,reference_id,extra_data,amount,gateway_order_id,status) VALUES (?,?,?,?,?,?,'created')")
+        ->execute([$customerId, $purpose, $planId, json_encode(['billing_cycle'=>$cycle]), $amount, $order['id']]);
+    $txnId = $pdo->lastInsertId();
+
+    $cust = $pdo->prepare("SELECT name,email,phone FROM users WHERE id=?"); $cust->execute([$customerId]); $cust = $cust->fetch();
+    echo json_encode([
+        'ok' => true, 'key_id' => RAZORPAY_KEY_ID, 'order_id' => $order['id'], 'amount' => $order['amount'],
+        'currency' => 'INR', 'txn_id' => $txnId, 'name' => 'PaperMart',
+        'description' => $plan['name'] . ' Plan (' . $cycle . ')',
+        'prefill' => ['name' => $cust['name'] ?? '', 'email' => $cust['email'] ?? '', 'contact' => $cust['phone'] ?? ''],
+    ]);
+    exit;
+}
+
 if (!isLoggedIn() || $_SESSION['role'] !== 'vendor') {
     echo json_encode(['ok' => false, 'msg' => 'Please log in again and retry.']); exit;
 }
@@ -30,7 +71,6 @@ if (isTeamMemberSession()) {
 }
 
 $vendorId = effectiveVendorId();
-$purpose  = $_POST['purpose'] ?? '';
 
 if ($purpose === 'subscription') {
     $planId = (int)($_POST['plan_id'] ?? 0);
@@ -87,7 +127,7 @@ echo json_encode([
     'amount'      => $order['amount'], // paise, echoed back to Checkout as-is
     'currency'    => 'INR',
     'txn_id'      => $txnId,
-    'name'        => 'paperKart',
+    'name'        => 'PaperMart',
     'description' => $description,
     'prefill'     => ['name' => $vendor['name'] ?? '', 'email' => $vendor['email'] ?? '', 'contact' => $vendor['phone'] ?? ''],
 ]);
