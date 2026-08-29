@@ -10,7 +10,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     header('Content-Type: text/csv');
     header('Content-Disposition: attachment; filename="invoices_' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['Invoice #','Vendor','Company','Type','Description','Amount','Payment Ref','Date']);
+    fputcsv($out, ['Invoice #','Vendor / Customer','Company','Type','Description','Amount','Payment Ref','Date']);
     $rows = $pdo->query(
         "SELECT i.*, u.name AS vendor_name FROM invoices i JOIN users u ON u.id=i.vendor_id ORDER BY i.issued_at DESC"
     )->fetchAll();
@@ -72,8 +72,9 @@ include __DIR__ . '/../includes/head.php';
                 </div>
                 <select name="type" class="form-control" style="width:160px">
                     <option value="">All Types</option>
-                    <option value="subscription" <?= $type==='subscription'?'selected':'' ?>>Subscription</option>
-                    <option value="ad"           <?= $type==='ad'?'selected':'' ?>>Advertising</option>
+                    <option value="subscription"          <?= $type==='subscription'?'selected':'' ?>>Vendor Subscription</option>
+                    <option value="customer_subscription" <?= $type==='customer_subscription'?'selected':'' ?>>Customer Subscription</option>
+                    <option value="ad"                    <?= $type==='ad'?'selected':'' ?>>Advertising</option>
                 </select>
                 <button type="submit" class="btn btn-primary btn-sm">Search</button>
                 <?php if ($search||$type): ?><a href="?" class="btn btn-outline btn-sm">Clear</a><?php endif; ?>
@@ -82,7 +83,7 @@ include __DIR__ . '/../includes/head.php';
         <?php if ($invoices): ?>
         <div class="table-wrapper">
             <table>
-                <thead><tr><th>Invoice #</th><th>Vendor</th><th>Description</th><th>Type</th><th>Amount</th><th>Date</th><th></th></tr></thead>
+                <thead><tr><th>Invoice #</th><th>Vendor / Customer</th><th>Description</th><th>Type</th><th>Amount</th><th>Date</th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($invoices as $inv): ?>
                 <tr>
@@ -92,7 +93,7 @@ include __DIR__ . '/../includes/head.php';
                         <div style="font-size:11.5px;color:var(--text-muted)"><?= sanitize($inv['vendor_name']) ?></div>
                     </td>
                     <td style="font-size:13px"><?= sanitize($inv['description']) ?></td>
-                    <td><span class="badge <?= $inv['type']==='subscription'?'badge-info':'badge-warning' ?>"><?= ucfirst($inv['type']) ?></span></td>
+                    <td><span class="badge <?= $inv['type']==='ad'?'badge-warning':'badge-info' ?>"><?= match($inv['type']){'subscription'=>'Vendor Sub','customer_subscription'=>'Customer Sub','ad'=>'Advertising',default=>ucfirst($inv['type'])} ?></span></td>
                     <td style="font-weight:700">₹<?= number_format($inv['amount'],2) ?></td>
                     <td class="text-muted" style="font-size:12.5px"><?= date('d M Y', strtotime($inv['issued_at'])) ?></td>
                     <td><a href="invoice.php?id=<?= $inv['id'] ?>" target="_blank" class="btn btn-outline btn-xs">📄 View</a></td>
