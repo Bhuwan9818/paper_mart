@@ -134,5 +134,27 @@ function fulfillPaymentTransaction($pdo, $txn, $paymentId, $signature) {
         // and can manage timing manually, same as today.
     }
 
+    if ($txn['purpose'] === 'customer_subscription') {
+        $planId = (int)$txn['reference_id'];
+        $cycle  = $extra['billing_cycle'] ?? 'monthly';
+        $customerId = (int)$txn['vendor_id']; // same generic payer-id column used for every purpose
+
+        $pdo->prepare("UPDATE customer_subscriptions SET status='cancelled' WHERE customer_id=? AND status IN('active','trial')")
+            ->execute([$customerId]);
+        $expires = $cycle === 'yearly' ? date('Y-m-d H:i:s', strtotime('+1 year')) : date('Y-m-d H:i:s', strtotime('+1 month'));
+        $pdo->prepare("INSERT INTO customer_subscriptions (customer_id,plan_id,billing_cycle,status,started_at,expires_at) VALUES(?,?,?,'active',NOW(),?)")
+            ->execute([$customerId, $planId, $cycle, $expires]);
+        $pdo->prepare("INSERT INTO customer_payments (customer_id,plan_id,amount,billing_cycle,status,paid_at) VALUES(?,?,?,?,'paid',NOW())")
+            ->execute([$customerId, $planId, $txn['amount'], $cycle]);
+        $custPaymentId = (int)$pdo->lastInsertId();
+
+        $planName = $pdo->prepare("SELECT name FROM customer_plans WHERE id=?");
+        $planName->execute([$planId]); $planName = $planName->fetchColumn() ?: 'Premium';
+        if (function_exists('createInvoice')) {
+            createInvoice($pdo, 'customer_subscription', $customerId, $custPaymentId, $txn['id'], $txn['amount'],
+                $planName . ' Plan — ' . ucfirst($cycle) . ' Subscription', $paymentId);
+        }
+    }
+
     return ['ok' => true, 'already' => false];
 }
