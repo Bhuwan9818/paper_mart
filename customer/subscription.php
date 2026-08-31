@@ -37,7 +37,7 @@ $plans = $pdo->query("SELECT * FROM customer_plans WHERE is_active=1 ORDER BY so
 $pageTitle = 'Subscription'; $activePage = 'subscription';
 include __DIR__ . '/../includes/head.php';
 ?>
-<?php renderTopbar('Subscription'); ?>
+<?php // renderTopbar('Subscription'); ?>
 <div class="content">
     <?= showFlash() ?>
     <div class="page-header"><h1>⭐ Your Plan</h1></div>

@@ -19,7 +19,7 @@ $invoices = $stmt->fetchAll();
 $pageTitle = 'Invoices'; $activePage = 'invoices';
 include __DIR__ . '/../includes/head.php';
 ?>
-<?php renderTopbar('Invoices'); ?>
+<?php // renderTopbar('Invoices'); ?>
 <div class="content">
     <?= showFlash() ?>
     <div class="page-header">

@@ -37,7 +37,7 @@ if ($hasFullAnalytics) {
 $pageTitle = 'Analytics'; $activePage = 'analytics';
 include __DIR__ . '/../includes/head.php';
 ?>
-<?php renderTopbar('Analytics'); ?>
+<?php // renderTopbar('Analytics'); ?>
 <div class="content">
     <?= showFlash() ?>
     <div class="page-header"><h1>📊 My Analytics</h1></div>
