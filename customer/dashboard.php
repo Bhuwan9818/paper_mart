@@ -3,8 +3,11 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
 requireRoleStrict('customer');
+require_once __DIR__ . '/../includes/customer_subscription.php';
 $user = currentUser();
 $uid  = $user['id'];
+$sub  = getCustomerSubscription($pdo, $uid);
+$usage = getCustomerUsage($pdo, $uid);
 
 $matchWhere = "(we.customer_id = ? OR (we.customer_id IS NULL AND we.email = ?))";
 $matchParams = [$uid, $user['email']];
@@ -33,6 +36,25 @@ include __DIR__ . '/../includes/head.php';
     <?= showFlash() ?>
     <div class="page-header">
         <h1>👋 Welcome, <?= sanitize(explode(' ',$user['name'])[0]) ?>!</h1>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+        <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+            <div>
+                <div style="font-size:12.5px;color:var(--text-muted)">Your Plan</div>
+                <div style="font-size:20px;font-weight:800;color:var(--primary)">⭐ <?= sanitize($sub['plan_name'] ?? 'Free') ?></div>
+            </div>
+            <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:12.5px">
+                <div>Compares: <strong><?= $usage['compares_used'] ?><?= $sub['compare_limit']==-1?'':' / '.$sub['compare_limit'] ?></strong></div>
+                <div>TDS Downloads: <strong><?= $usage['tds_downloaded'] ?><?= $sub['tds_limit']==-1?'':' / '.$sub['tds_limit'] ?></strong></div>
+                <div>Enquiries: <strong><?= $usage['enquiries_sent'] ?><?= $sub['enquiry_limit']==-1?'':' / '.$sub['enquiry_limit'] ?></strong></div>
+            </div>
+            <?php if (($sub['slug'] ?? 'free') === 'free'): ?>
+                <a href="<?= BASE_URL ?>/customer/subscription.php" class="btn btn-primary btn-sm">Upgrade to Premium</a>
+            <?php else: ?>
+                <a href="<?= BASE_URL ?>/customer/subscription.php" class="btn btn-outline btn-sm">Manage Plan</a>
+            <?php endif; ?>
+        </div>
     </div>
     <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
         <div class="stat-card"><div class="stat-icon amber">📩</div><div class="stat-info"><div class="value"><?= $totalEnq ?></div><div class="label">Total Enquiries</div></div></div>
