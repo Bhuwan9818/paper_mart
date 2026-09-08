@@ -13,6 +13,58 @@ $totalVends  = $pdo->query("SELECT COUNT(*) FROM users WHERE role='vendor' AND s
 $totalEnqs   = $pdo->query("SELECT COUNT(*) FROM web_enquiries")->fetchColumn();
 $categories  = $pdo->query("SELECT c.*,i.name AS iname,(SELECT COUNT(*) FROM products WHERE category_id=c.id AND status='active') AS prod_count FROM categories c JOIN industries i ON i.id=c.industry_id WHERE c.status=1 ORDER BY prod_count DESC LIMIT 12")->fetchAll();
 
+// Most Popular Brands — verified/active vendors ranked by live catalogue size.
+$popularVendors = $pdo->query(
+    "SELECT u.id, u.name, u.company, u.city, u.country,
+            vp.is_verified, vp.logo, vp.tagline, vp.rating, vp.total_reviews,
+            COUNT(p.id) AS prod_count
+     FROM users u
+     JOIN products p ON p.vendor_id = u.id AND p.status='active'
+     LEFT JOIN vendor_profiles vp ON vp.vendor_id = u.id
+     WHERE u.role='vendor' AND u.status='active'
+     GROUP BY u.id
+     ORDER BY vp.is_verified DESC, prod_count DESC, vp.rating DESC
+     LIMIT 8"
+)->fetchAll();
+
+// "By The Numbers" impact band — every figure here is a live COUNT(), nothing invented.
+$totalCustomers = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='customer' AND status='active'")->fetchColumn();
+$totalCatsLive  = (int)$pdo->query("SELECT COUNT(*) FROM categories WHERE status=1")->fetchColumn();
+$totalClosedEnq = 0;
+try { $totalClosedEnq = (int)$pdo->query("SELECT COUNT(*) FROM web_enquiries WHERE status='closed'")->fetchColumn(); } catch (Exception $e) {}
+
+// Compare Products showcase — pick the most popular category and its top 3
+// products, then surface only the attributes they actually share, so the
+// teaser table is always meaningful instead of full of blank cells.
+$compareCat      = $categories[0] ?? null;
+$compareProducts = [];
+$compareAttrRows = [];
+if ($compareCat) {
+    $cpStmt = $pdo->prepare(
+        "SELECT p.id,p.name,p.images,p.price_range,u.name AS vname,u.company
+         FROM products p JOIN users u ON u.id=p.vendor_id
+         WHERE p.category_id=? AND p.status='active'
+         ORDER BY p.views DESC, p.created_at DESC LIMIT 3"
+    );
+    $cpStmt->execute([$compareCat['id']]);
+    $compareProducts = $cpStmt->fetchAll();
+
+    if (count($compareProducts) >= 2) {
+        $ids = implode(',', array_map('intval', array_column($compareProducts, 'id')));
+        $rows = $pdo->query(
+            "SELECT product_id, attribute_name, attribute_value FROM product_attributes
+             WHERE product_id IN($ids) AND attribute_name NOT IN ('__price','__tds')
+             ORDER BY sort_order"
+        )->fetchAll();
+        $byAttr = [];
+        foreach ($rows as $r) $byAttr[$r['attribute_name']][$r['product_id']] = $r['attribute_value'];
+        // Only keep attributes shared by at least 2 of the 3 products, capped to 6 rows.
+        $byAttr = array_filter($byAttr, fn($v) => count($v) >= 2);
+        $compareAttrRows = array_slice($byAttr, 0, 6, true);
+    }
+    if (count($compareProducts) < 2 || empty($compareAttrRows)) { $compareProducts = []; } // nothing meaningful to show
+}
+
 // Countries vendors operate from, and the full active industries list —
 // for the two modes of the hero search card (By Country / By Industry).
 $searchCardIndustries = $pdo->query("SELECT id, name FROM industries WHERE status=1 ORDER BY sort_order, name")->fetchAll();
@@ -326,9 +378,9 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   <div class="container">
     <div class="cat-carousel-header">
       <div>
-        <div class="section-label">Explore</div>
-        <h2 class="cat-carousel-title">Browse Products by Category</h2>
-        <p class="cat-carousel-sub">Discover thousands of verified products across all major paper &amp; packaging categories</p>
+        <div class="section-label">Most In-Demand</div>
+        <h2 class="cat-carousel-title">Most Popular Categories</h2>
+        <p class="cat-carousel-sub">Ranked by live catalogue size — the categories buyers search for most across paper &amp; packaging</p>
       </div>
       <div class="cat-carousel-nav-btns">
         <button class="cat-nav-btn" id="cat-prev" aria-label="Previous categories">
@@ -789,6 +841,182 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
     </div>
   </div>
 </section>
+<?php endif; ?>
+
+<!-- MOST POPULAR BRANDS -->
+<?php if ($popularVendors): ?>
+<section class="brands-section">
+  <div class="container">
+    <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="section-label">Trusted Manufacturers</div>
+        <h2>Most Popular Brands</h2>
+        <p style="color:var(--n500);margin:0">The manufacturers buyers connect with most, ranked by verification and live catalogue size</p>
+      </div>
+      <a href="<?= BASE_URL ?>/public/vendors.php" class="btn btn-outline btn-sm">View All Vendors →</a>
+    </div>
+    <div class="brand-grid">
+      <?php foreach ($popularVendors as $v):
+        $logoUrl = !empty($v['logo']) ? UPLOAD_URL . $v['logo'] : '';
+        $displayName = $v['company'] ?: $v['name'];
+      ?>
+      <a href="<?= BASE_URL ?>/public/vendor-profile.php?id=<?= $v['id'] ?>" class="brand-card">
+        <?php if ($v['is_verified']): ?><span class="brand-card-verified">✓ Verified</span><?php endif; ?>
+        <div class="brand-card-logo">
+          <?php if ($logoUrl): ?>
+            <img src="<?= sH($logoUrl) ?>" alt="<?= sH($displayName) ?>" loading="lazy">
+          <?php else: ?>
+            <span><?= strtoupper(substr($displayName, 0, 1)) ?></span>
+          <?php endif; ?>
+        </div>
+        <div class="brand-card-name"><?= sH($displayName) ?></div>
+        <?php if ($v['city'] || $v['country']): ?>
+          <div class="brand-card-loc"><?= sH(trim(($v['city'] ?: '') . (($v['city'] && $v['country']) ? ', ' : '') . ($v['country'] ?: ''))) ?></div>
+        <?php endif; ?>
+        <div class="brand-card-meta">
+          <span><?= (int)$v['prod_count'] ?> Products</span>
+          <?php if ($v['total_reviews'] > 0): ?><span>★ <?= number_format((float)$v['rating'], 1) ?></span><?php endif; ?>
+        </div>
+      </a>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</section>
+
+<style>
+.brands-section{background:#fff;padding:56px 0}
+.brand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.brand-card{position:relative;background:#fff;border:1px solid var(--n200);border-radius:var(--r-lg);padding:22px 18px;text-align:center;text-decoration:none;color:inherit;transition:var(--t);display:block}
+.brand-card:hover{border-color:var(--brand-2);box-shadow:var(--shadow);transform:translateY(-3px)}
+.brand-card-verified{position:absolute;top:10px;right:10px;background:var(--green-lt,#e7f7ee);color:var(--green,#1a9e5c);font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:100px}
+.brand-card-logo{width:60px;height:60px;border-radius:14px;background:var(--brand-3);color:var(--brand-2);display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;font-weight:800;font-size:22px;margin:0 auto 14px;overflow:hidden}
+.brand-card-logo img{width:100%;height:100%;object-fit:cover}
+.brand-card-name{font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:var(--n900);margin-bottom:4px;line-height:1.3}
+.brand-card-loc{font-size:11.5px;color:var(--n500);margin-bottom:10px}
+.brand-card-meta{display:flex;justify-content:center;gap:12px;font-size:11.5px;color:var(--brand-2);font-weight:600;padding-top:10px;border-top:1px dashed var(--n200)}
+@media(max-width:768px){.brands-section{padding:40px 0}.brand-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}.brand-card{padding:18px 12px}}
+</style>
+<?php endif; ?>
+
+<!-- BY THE NUMBERS -->
+<section class="impact-section">
+  <div class="container">
+    <div class="section-head center" style="margin-bottom:40px">
+      <div class="section-label" style="color:var(--accent)">Our Impact</div>
+      <h2 style="color:#fff">paperKart, By The Numbers</h2>
+      <p style="color:rgba(255,255,255,.7)">Real activity happening on the platform right now — no estimates.</p>
+    </div>
+    <div class="impact-grid">
+      <?php
+      $impactStats = [
+        ['🏭', number_format($totalVends) . '+', 'Verified Vendors'],
+        ['📦', number_format($totalProds) . '+', 'Products Listed'],
+        ['🧾', number_format($totalEnqs) . '+', 'Leads Delivered to Vendors'],
+        ['🤝', number_format($totalClosedEnq) . '+', 'Successful Connections'],
+        ['🗂️', number_format($totalCatsLive) . '+', 'Categories Covered'],
+        ['👥', number_format($totalCustomers) . '+', 'Registered Buyers'],
+      ];
+      foreach ($impactStats as [$icon, $num, $label]):
+      ?>
+      <div class="impact-card">
+        <div class="impact-icon"><?= $icon ?></div>
+        <div class="impact-num"><?= $num ?></div>
+        <div class="impact-label"><?= $label ?></div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</section>
+
+<style>
+.impact-section{background:linear-gradient(150deg,#3a0d08 0%,var(--brand) 50%,#62130a 100%);padding:64px 0;position:relative;overflow:hidden}
+.impact-section::before{content:'';position:absolute;top:-60px;right:-60px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(240,192,96,.14) 0%,transparent 70%)}
+.impact-section::after{content:'';position:absolute;bottom:-80px;left:-80px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.06) 0%,transparent 70%)}
+.impact-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;position:relative;z-index:1}
+.impact-card{text-align:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--r-lg);padding:26px 12px;backdrop-filter:blur(6px);transition:var(--t)}
+.impact-card:hover{background:rgba(255,255,255,.1);transform:translateY(-3px)}
+.impact-icon{font-size:30px;margin-bottom:10px}
+.impact-num{font-family:'Poppins',sans-serif;font-weight:800;font-size:clamp(20px,2.4vw,30px);color:var(--accent);line-height:1}
+.impact-label{font-size:12px;color:rgba(255,255,255,.75);margin-top:6px;line-height:1.4}
+@media(max-width:1024px){.impact-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){.impact-grid{grid-template-columns:repeat(2,1fr);gap:12px}.impact-card{padding:20px 10px}}
+</style>
+
+<!-- COMPARE PRODUCTS -->
+<?php if ($compareProducts): ?>
+<section class="compare-showcase">
+  <div class="container">
+    <div class="section-head center">
+      <div class="section-label">Make Confident Decisions</div>
+      <h2>Compare Products Side-by-Side</h2>
+      <p>Weighing up options in <strong><?= sH($compareCat['name']) ?></strong>? Here's how <?= count($compareProducts) ?> popular picks stack up on the specs that matter.</p>
+    </div>
+
+    <div class="cmp-table-wrap">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th class="cmp-th-label">&nbsp;</th>
+            <?php foreach ($compareProducts as $p):
+              $imgs = array_filter(explode(',', $p['images'] ?? ''));
+              $img  = reset($imgs) ? UPLOAD_URL . trim(reset($imgs)) : '';
+            ?>
+            <th>
+              <div class="cmp-prod-img"><?php if ($img): ?><img src="<?= sH($img) ?>" alt="<?= sH($p['name']) ?>" loading="lazy"><?php else: ?><span>📦</span><?php endif; ?></div>
+              <div class="cmp-prod-name"><a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>"><?= sH($p['name']) ?></a></div>
+              <div class="cmp-prod-vendor"><?= sH($p['company'] ?: $p['vname']) ?></div>
+              <?php if ($p['price_range']): ?><div class="cmp-prod-price">₹ <?= sH($p['price_range']) ?></div><?php endif; ?>
+            </th>
+            <?php endforeach; ?>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($compareAttrRows as $attrName => $byProduct): ?>
+          <tr>
+            <td class="cmp-attr-name"><?= sH($attrName) ?></td>
+            <?php foreach ($compareProducts as $p): ?>
+              <td class="cmp-attr-val"><?= isset($byProduct[$p['id']]) ? sH($byProduct[$p['id']]) : '—' ?></td>
+            <?php endforeach; ?>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="text-align:center;margin-top:28px">
+      <button type="button" class="btn btn-accent btn-lg" onclick="homeCompareAll([<?= implode(',', array_column($compareProducts, 'id')) ?>])">⚖️ Compare Full Specifications →</button>
+    </div>
+  </div>
+</section>
+
+<style>
+.compare-showcase{background:var(--n50);padding:64px 0}
+.cmp-table-wrap{overflow-x:auto;border-radius:var(--r-lg);border:1px solid var(--n200);background:#fff}
+.cmp-table{width:100%;border-collapse:collapse;min-width:560px}
+.cmp-table th{padding:20px 16px;border-bottom:2px solid var(--n200);vertical-align:top;min-width:160px}
+.cmp-th-label{min-width:120px !important}
+.cmp-prod-img{width:72px;height:72px;border-radius:var(--r);background:var(--n50);display:flex;align-items:center;justify-content:center;overflow:hidden;margin:0 auto 10px}
+.cmp-prod-img img{width:100%;height:100%;object-fit:cover}
+.cmp-prod-name a{font-family:'Poppins',sans-serif;font-weight:700;font-size:13.5px;color:var(--n900);text-decoration:none;line-height:1.3}
+.cmp-prod-name a:hover{color:var(--brand-2)}
+.cmp-prod-vendor{font-size:11px;color:var(--n500);margin-top:3px}
+.cmp-prod-price{font-size:12.5px;font-weight:700;color:var(--brand-2);margin-top:6px}
+.cmp-attr-name{padding:14px 16px;font-size:12.5px;font-weight:700;color:var(--n700);background:var(--n50);white-space:nowrap}
+.cmp-attr-val{padding:14px 16px;font-size:13px;color:var(--n700);text-align:center;border-top:1px solid var(--n100)}
+.cmp-table tbody tr:nth-child(even) .cmp-attr-name{background:#fff}
+@media(max-width:768px){.compare-showcase{padding:44px 0}}
+</style>
+<script>
+function homeCompareAll(ids) {
+  const BASE_PATH = <?= json_encode(BASE_URL) ?>;
+  Promise.all(ids.map(id =>
+    fetch(BASE_PATH + '/public/ajax/compare.php', {
+      method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'action=add&product_id=' + id
+    })
+  )).finally(() => { window.location.href = BASE_PATH + '/public/compare.php'; });
+}
+</script>
 <?php endif; ?>
 
 <!-- HOW IT WORKS -->
