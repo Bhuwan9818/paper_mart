@@ -68,6 +68,11 @@ if ($compareCat) {
 // Countries vendors operate from, and the full active industries list —
 // for the two modes of the hero search card (By Country / By Industry).
 $searchCardIndustries = $pdo->query("SELECT id, name FROM industries WHERE status=1 ORDER BY sort_order, name")->fetchAll();
+$searchCardVendors = $pdo->query(
+    "SELECT DISTINCT u.id, COALESCE(u.company, u.name) AS label
+     FROM users u JOIN products p ON p.vendor_id=u.id AND p.status='active'
+     WHERE u.role='vendor' AND u.status='active' ORDER BY label ASC LIMIT 200"
+)->fetchAll();
 $heroCountries = $pdo->query(
     "SELECT DISTINCT u.country
      FROM users u JOIN products p ON p.vendor_id=u.id AND p.status='active'
@@ -183,8 +188,8 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 
       <div class="ad-search-toggle">
         <label class="ad-search-radio">
-          <input type="radio" name="search-mode" value="country" onchange="asSwitchMode('country')">
-          <span class="ad-search-radio-dot"></span> By Country
+          <input type="radio" name="search-mode" value="brand" onchange="asSwitchMode('brand')">
+          <span class="ad-search-radio-dot"></span> By Brand
         </label>
         <label class="ad-search-radio">
           <input type="radio" name="search-mode" value="industry" checked onchange="asSwitchMode('industry')">
@@ -193,34 +198,57 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       </div>
 
       <form action="<?= BASE_URL ?>/public/products.php" method="GET" id="hero-search-form">
-        <!-- Country mode -->
-        <div id="as-group-country" class="as-group" style="display:none">
-          <select name="country" id="as-country" class="ad-search-field" onchange="asOnCountryChange()">
-            <option value="">Select Country</option>
+        <!-- Brand mode: Country → Brand → Industry → Category -->
+        <div id="as-group-brand" class="as-group" style="display:none">
+          <select name="country" id="asb-country" class="ad-search-field" onchange="asOnBrandModeCountryChange()">
+            <option value="">All Countries</option>
             <?php foreach($heroCountries as $c): ?>
               <option value="<?= sH($c) ?>"><?= sH($c) ?></option>
             <?php endforeach; ?>
           </select>
-          <select name="vendor" id="as-brand" class="ad-search-field" disabled>
-            <option value="">Select Country first…</option>
+          <select name="vendor" id="asb-brand" class="ad-search-field" onchange="asOnBrandModeBrandChange()">
+            <option value="">All Brands</option>
+            <?php foreach($searchCardVendors as $v): ?>
+              <option value="<?= $v['id'] ?>"><?= sH($v['label']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <select name="industry" id="asb-industry" class="ad-search-field" onchange="asOnBrandModeIndustryChange()">
+            <option value="">All Industries</option>
+            <?php foreach($searchCardIndustries as $ind): ?>
+              <option value="<?= $ind['id'] ?>"><?= sH($ind['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <select name="category" id="asb-category" class="ad-search-field" disabled>
+            <option value="">All Categories</option>
           </select>
         </div>
 
-        <!-- Industry mode -->
+        <!-- Industry mode: Industry → Category → Product Type → Country → Brand -->
         <div id="as-group-industry" class="as-group">
-          <select name="industry" id="as-industry" class="ad-search-field" onchange="asOnIndustryChange()">
+          <select name="industry" id="asi-industry" class="ad-search-field" onchange="asOnIndustryChange()">
             <option value="">Select Industry</option>
             <?php foreach($searchCardIndustries as $ind): ?>
               <option value="<?= $ind['id'] ?>"><?= sH($ind['name']) ?></option>
             <?php endforeach; ?>
           </select>
-          <select name="category" id="as-category" class="ad-search-field" onchange="asOnCategoryChange()" disabled>
+          <select name="category" id="asi-category" class="ad-search-field" onchange="asOnCategoryChange()" disabled>
             <option value="">Select Industry first…</option>
           </select>
-          <select name="type" id="as-type" class="ad-search-field" disabled>
+          <select name="type" id="asi-type" class="ad-search-field" disabled>
             <option value="">Select Category first…</option>
           </select>
-          <!-- <input type="text" name="q" placeholder="Product, GSM, specification…" class="ad-search-field"> -->
+          <select name="country" id="asi-country" class="ad-search-field" onchange="asOnIndustryModeCountryChange()">
+            <option value="">All Countries</option>
+            <?php foreach($heroCountries as $c): ?>
+              <option value="<?= sH($c) ?>"><?= sH($c) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <select name="vendor" id="asi-brand" class="ad-search-field">
+            <option value="">All Brands</option>
+            <?php foreach($searchCardVendors as $v): ?>
+              <option value="<?= $v['id'] ?>"><?= sH($v['label']) ?></option>
+            <?php endforeach; ?>
+          </select>
         </div>
 
         
@@ -293,83 +321,173 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 <script>
 (function(){
   const BASE_PATH = <?= json_encode(BASE_URL) ?>;
+  const ALL_INDUSTRIES = <?= json_encode(array_map(fn($i) => ['id' => $i['id'], 'name' => $i['name']], $searchCardIndustries)) ?>;
+
+  function escLbl(s){ return String(s).replace(/</g,'&lt;'); }
 
   window.asSwitchMode = function(mode){
-    const countryGroup  = document.getElementById('as-group-country');
+    const brandGroup    = document.getElementById('as-group-brand');
     const industryGroup = document.getElementById('as-group-industry');
-    const showCountry = mode === 'country';
+    const showBrand = mode === 'brand';
 
-    countryGroup.style.display  = showCountry ? 'block' : 'none';
-    industryGroup.style.display = showCountry ? 'none'  : 'block';
+    brandGroup.style.display    = showBrand ? 'block' : 'none';
+    industryGroup.style.display = showBrand ? 'none'  : 'block';
 
     // Disable every field in the hidden group (so stale selections never
-    // get submitted alongside the active mode's filters) and re-enable the
-    // visible group's top-level field. Dependent fields (brand/category/
-    // type) stay disabled until their parent is actually chosen.
-    countryGroup.querySelectorAll('select').forEach(el => el.disabled = !showCountry);
-    industryGroup.querySelectorAll('select').forEach(el => el.disabled = showCountry);
+    // get submitted alongside the active mode's filters) and re-enable
+    // the visible group. Country/Brand/Industry are independent ("All …"
+    // is a valid choice) — only Category/Type stay gated behind their
+    // parent selection until one is actually made.
+    brandGroup.querySelectorAll('select').forEach(el => el.disabled = !showBrand);
+    industryGroup.querySelectorAll('select').forEach(el => el.disabled = showBrand);
 
-    if (showCountry) {
-      document.getElementById('as-brand').disabled = !document.getElementById('as-country').value;
+    if (showBrand) {
+      document.getElementById('asb-category').disabled = !document.getElementById('asb-industry').value;
     } else {
-      document.getElementById('as-category').disabled = !document.getElementById('as-industry').value;
-      document.getElementById('as-type').disabled = !document.getElementById('as-category').value;
+      document.getElementById('asi-category').disabled = !document.getElementById('asi-industry').value;
+      document.getElementById('asi-type').disabled = !document.getElementById('asi-category').value;
     }
   };
 
-  window.asOnCountryChange = function(){
-    const country = document.getElementById('as-country').value;
-    const brandSel = document.getElementById('as-brand');
-    brandSel.innerHTML = '<option value="">Loading…</option>';
-    brandSel.disabled = true;
-    if (!country) { brandSel.innerHTML = '<option value="">Select Country first…</option>'; return; }
+  /* ── Brand refresh (shared by both modes) ─────────────────────────
+     Industry mode calls it with whatever industry/category/type/country
+     are currently set; Brand mode calls it with country only (brand
+     comes before industry/category in that mode). */
+  function asRefreshBrands(prefix, filters){
+    const brandSel = document.getElementById(prefix + '-brand');
+    const params = new URLSearchParams();
+    if (filters.industryId) params.set('industry_id', filters.industryId);
+    if (filters.categoryId) params.set('category_id', filters.categoryId);
+    if (filters.typeId)     params.set('type_id', filters.typeId);
+    if (filters.country)    params.set('country', filters.country);
 
-    fetch(BASE_PATH + '/public/ajax/get-brands-by-country.php?country=' + encodeURIComponent(country))
+    const keepValue = brandSel.value;
+    brandSel.innerHTML = '<option value="">Loading…</option>';
+    fetch(BASE_PATH + '/public/ajax/get-brands-filtered.php?' + params.toString())
       .then(r => r.json())
       .then(list => {
-        if (!list.length) { brandSel.innerHTML = '<option value="">No brands in this country</option>'; return; }
-        brandSel.innerHTML = '<option value="">Select Brand</option>' +
-          list.map(b => `<option value="${b.id}">${b.label.replace(/</g,'&lt;')}</option>`).join('');
-        brandSel.disabled = false;
+        brandSel.innerHTML = '<option value="">All Brands</option>' +
+          list.map(b => `<option value="${b.id}">${escLbl(b.label)}</option>`).join('');
+        // Keep the previous selection if it's still in the refreshed list.
+        if (keepValue && list.some(b => String(b.id) === keepValue)) brandSel.value = keepValue;
       })
-      .catch(() => { brandSel.innerHTML = '<option value="">Could not load brands</option>'; });
-  };
+      .catch(() => { brandSel.innerHTML = '<option value="">All Brands</option>'; });
+  }
 
+  /* ── INDUSTRY MODE: Industry → Category → Type → Country → Brand ── */
   window.asOnIndustryChange = function(){
-    const industryId = document.getElementById('as-industry').value;
-    const catSel = document.getElementById('as-category');
-    const typeSel = document.getElementById('as-type');
+    const industryId = document.getElementById('asi-industry').value;
+    const catSel  = document.getElementById('asi-category');
+    const typeSel = document.getElementById('asi-type');
     catSel.innerHTML = '<option value="">Loading…</option>'; catSel.disabled = true;
     typeSel.innerHTML = '<option value="">Select Category first…</option>'; typeSel.disabled = true;
-    if (!industryId) { catSel.innerHTML = '<option value="">Select Industry first…</option>'; return; }
 
-    fetch(BASE_PATH + '/public/ajax/get-categories-with-products.php?industry_id=' + industryId)
+    if (!industryId) {
+      catSel.innerHTML = '<option value="">Select Industry first…</option>';
+    } else {
+      fetch(BASE_PATH + '/public/ajax/get-categories-with-products.php?industry_id=' + industryId)
+        .then(r => r.json())
+        .then(list => {
+          if (!list.length) { catSel.innerHTML = '<option value="">No categories available</option>'; return; }
+          catSel.innerHTML = '<option value="">All Categories</option>' +
+            list.map(c => `<option value="${c.id}">${escLbl(c.name)}</option>`).join('');
+          catSel.disabled = false;
+        })
+        .catch(() => { catSel.innerHTML = '<option value="">Could not load categories</option>'; });
+    }
+
+    asRefreshBrands('asi', {
+      industryId, country: document.getElementById('asi-country').value
+    });
+  };
+
+  window.asOnCategoryChange = function(){
+    const categoryId = document.getElementById('asi-category').value;
+    const typeSel = document.getElementById('asi-type');
+    typeSel.innerHTML = '<option value="">Loading…</option>'; typeSel.disabled = true;
+
+    if (!categoryId) {
+      typeSel.innerHTML = '<option value="">Select Category first…</option>';
+    } else {
+      fetch(BASE_PATH + '/public/ajax/get-product-types-with-products.php?category_id=' + categoryId)
+        .then(r => r.json())
+        .then(list => {
+          if (!list.length) { typeSel.innerHTML = '<option value="">No product types available</option>'; return; }
+          typeSel.innerHTML = '<option value="">All Product Types</option>' +
+            list.map(t => `<option value="${t.id}">${escLbl(t.name)}</option>`).join('');
+          typeSel.disabled = false;
+        })
+        .catch(() => { typeSel.innerHTML = '<option value="">Could not load product types</option>'; });
+    }
+
+    asRefreshBrands('asi', {
+      industryId: document.getElementById('asi-industry').value,
+      categoryId,
+      country: document.getElementById('asi-country').value
+    });
+  };
+
+  window.asOnIndustryModeCountryChange = function(){
+    asRefreshBrands('asi', {
+      industryId: document.getElementById('asi-industry').value,
+      categoryId: document.getElementById('asi-category').value,
+      typeId: document.getElementById('asi-type').value,
+      country: document.getElementById('asi-country').value
+    });
+  };
+
+  /* ── BRAND MODE: Country → Brand → Industry → Category ───────────── */
+  window.asOnBrandModeCountryChange = function(){
+    asRefreshBrands('asb', { country: document.getElementById('asb-country').value });
+  };
+
+  window.asOnBrandModeBrandChange = function(){
+    const vendorId = document.getElementById('asb-brand').value;
+    const indSel = document.getElementById('asb-industry');
+    const catSel = document.getElementById('asb-category');
+    catSel.innerHTML = '<option value="">All Categories</option>'; catSel.disabled = true;
+
+    if (!vendorId) {
+      // "All Brands" — fall back to the full, unscoped industries list.
+      indSel.innerHTML = '<option value="">All Industries</option>' +
+        ALL_INDUSTRIES.map(i => `<option value="${i.id}">${escLbl(i.name)}</option>`).join('');
+      indSel.value = '';
+      return;
+    }
+    indSel.innerHTML = '<option value="">Loading…</option>';
+    fetch(BASE_PATH + '/public/ajax/get-industries-by-vendor.php?vendor_id=' + vendorId)
       .then(r => r.json())
       .then(list => {
-        if (!list.length) { catSel.innerHTML = '<option value="">No categories available</option>'; return; }
-        catSel.innerHTML = '<option value="">Select Category</option>' +
-          list.map(c => `<option value="${c.id}">${c.name.replace(/</g,'&lt;')}</option>`).join('');
+        indSel.innerHTML = '<option value="">All Industries</option>' +
+          list.map(i => `<option value="${i.id}">${escLbl(i.name)}</option>`).join('');
+      })
+      .catch(() => { indSel.innerHTML = '<option value="">Could not load industries</option>'; });
+  };
+
+  window.asOnBrandModeIndustryChange = function(){
+    const industryId = document.getElementById('asb-industry').value;
+    const vendorId   = document.getElementById('asb-brand').value;
+    const catSel = document.getElementById('asb-category');
+    catSel.innerHTML = '<option value="">Loading…</option>'; catSel.disabled = true;
+
+    if (!industryId) {
+      catSel.innerHTML = '<option value="">All Categories</option>';
+      return;
+    }
+    let url = BASE_PATH + '/public/ajax/get-categories-with-products.php?industry_id=' + industryId;
+    if (vendorId) url += '&vendor_id=' + vendorId;
+    fetch(url).then(r => r.json())
+      .then(list => {
+        catSel.innerHTML = '<option value="">All Categories</option>' +
+          list.map(c => `<option value="${c.id}">${escLbl(c.name)}</option>`).join('');
         catSel.disabled = false;
       })
       .catch(() => { catSel.innerHTML = '<option value="">Could not load categories</option>'; });
   };
 
-  window.asOnCategoryChange = function(){
-    const categoryId = document.getElementById('as-category').value;
-    const typeSel = document.getElementById('as-type');
-    typeSel.innerHTML = '<option value="">Loading…</option>'; typeSel.disabled = true;
-    if (!categoryId) { typeSel.innerHTML = '<option value="">Select Category first…</option>'; return; }
-
-    fetch(BASE_PATH + '/public/ajax/get-product-types-with-products.php?category_id=' + categoryId)
-      .then(r => r.json())
-      .then(list => {
-        if (!list.length) { typeSel.innerHTML = '<option value="">No product types available</option>'; return; }
-        typeSel.innerHTML = '<option value="">Select Product Type</option>' +
-          list.map(t => `<option value="${t.id}">${t.name.replace(/</g,'&lt;')}</option>`).join('');
-        typeSel.disabled = false;
-      })
-      .catch(() => { typeSel.innerHTML = '<option value="">Could not load product types</option>'; });
-  };
+  // Ensure the hidden mode's fields start correctly disabled (defence
+  // against duplicate same-name fields both serializing on submit).
+  asSwitchMode('industry');
 })();
 </script>
 
