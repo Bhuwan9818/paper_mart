@@ -24,6 +24,7 @@ function siteGateExemptFiles() {
 }
 
 function isSiteGateUnlocked() {
+    if (php_sapi_name() === 'cli') return true;
     if (session_status() === PHP_SESSION_NONE) session_start();
     if (!empty($_SESSION['site_gate_unlocked'])) return true;
 

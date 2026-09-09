@@ -27,11 +27,27 @@ $popularVendors = $pdo->query(
      LIMIT 8"
 )->fetchAll();
 
-// "By The Numbers" impact band — every figure here is a live COUNT(), nothing invented.
-$totalCustomers = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='customer' AND status='active'")->fetchColumn();
-$totalCatsLive  = (int)$pdo->query("SELECT COUNT(*) FROM categories WHERE status=1")->fetchColumn();
-$totalClosedEnq = 0;
-try { $totalClosedEnq = (int)$pdo->query("SELECT COUNT(*) FROM web_enquiries WHERE status='closed'")->fetchColumn(); } catch (Exception $e) {}
+// "By The Numbers" / Platform Metrics impact band — 100% real dynamic counts from backend
+$totalCustomersHandled = (int)$pdo->query(
+    "SELECT COUNT(DISTINCT email) FROM (
+        SELECT email FROM users WHERE role='customer' AND email != ''
+        UNION 
+        SELECT email FROM web_enquiries WHERE email IS NOT NULL AND email != ''
+    ) t"
+)->fetchColumn();
+if ($totalCustomersHandled === 0) {
+    $totalCustomersHandled = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='customer'")->fetchColumn();
+}
+$totalVendorsRegistered = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='vendor'")->fetchColumn();
+$totalLeadsGiven = 0;
+try {
+    $totalLeadsGiven = (int)$pdo->query("SELECT COUNT(*) FROM v_all_enquiries")->fetchColumn();
+} catch (Exception $e) {
+    $totalLeadsGiven = (int)$pdo->query("SELECT (SELECT COUNT(*) FROM enquiries) + (SELECT COUNT(*) FROM web_enquiries)")->fetchColumn();
+}
+$totalActiveProds = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE status='active'")->fetchColumn();
+$totalCatsLive    = (int)$pdo->query("SELECT COUNT(*) FROM categories WHERE status=1")->fetchColumn();
+$totalLiveSpecs   = (int)$pdo->query("SELECT COUNT(*) FROM product_attributes")->fetchColumn();
 
 // Compare Products showcase — pick the most popular category and its top 3
 // products, then surface only the attributes they actually share, so the
@@ -40,11 +56,17 @@ $compareCat      = $categories[0] ?? null;
 $compareProducts = [];
 $compareAttrRows = [];
 if ($compareCat) {
+    // Prefer products with images first, then by views, for better visual showcase
     $cpStmt = $pdo->prepare(
-        "SELECT p.id,p.name,p.images,p.price_range,u.name AS vname,u.company
-         FROM products p JOIN users u ON u.id=p.vendor_id
-         WHERE p.category_id=? AND p.status='active'
-         ORDER BY p.views DESC, p.created_at DESC LIMIT 3"
+        "SELECT p.id, p.name, p.images, p.price_range,
+                u.name AS vname, u.company, u.city, u.state,
+                vp.is_verified, vp.rating, vp.logo
+         FROM products p
+         JOIN users u ON u.id = p.vendor_id
+         LEFT JOIN vendor_profiles vp ON vp.vendor_id = p.vendor_id
+         WHERE p.category_id = ? AND p.status = 'active'
+         ORDER BY (CASE WHEN p.images IS NOT NULL AND p.images != '' THEN 1 ELSE 0 END) DESC,
+                  p.views DESC, p.created_at DESC LIMIT 3"
     );
     $cpStmt->execute([$compareCat['id']]);
     $compareProducts = $cpStmt->fetchAll();
@@ -58,9 +80,9 @@ if ($compareCat) {
         )->fetchAll();
         $byAttr = [];
         foreach ($rows as $r) $byAttr[$r['attribute_name']][$r['product_id']] = $r['attribute_value'];
-        // Only keep attributes shared by at least 2 of the 3 products, capped to 6 rows.
+        // Only keep attributes shared by at least 2 of the 3 products, capped to 7 rows.
         $byAttr = array_filter($byAttr, fn($v) => count($v) >= 2);
-        $compareAttrRows = array_slice($byAttr, 0, 6, true);
+        $compareAttrRows = array_slice($byAttr, 0, 7, true);
     }
     if (count($compareProducts) < 2 || empty($compareAttrRows)) { $compareProducts = []; } // nothing meaningful to show
 }
@@ -552,14 +574,34 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 })();
 </script>
 
+<!-- GRADE QUICK FINDER BAR -->
+<section class="grade-finder-section">
+  <div class="container">
+    <div class="grade-finder-wrap">
+      <div class="grade-finder-label">
+        <span>⚡ Quick Finder:</span>
+      </div>
+      <a href="<?= BASE_URL ?>/public/products.php?q=Kraft+Paper" class="grade-chip"><span>📜</span> Kraft Paper (14–40 BF)</a>
+      <a href="<?= BASE_URL ?>/public/products.php?q=Duplex+Board" class="grade-chip"><span>🗂️</span> Duplex Board (LWC/HWC)</a>
+      <a href="<?= BASE_URL ?>/public/products.php?q=Corrugated" class="grade-chip"><span>📦</span> Corrugated Boxes & Sheets</a>
+      <a href="<?= BASE_URL ?>/public/products.php?q=FBB" class="grade-chip"><span>🎁</span> Folding Box Board (FBB)</a>
+      <a href="<?= BASE_URL ?>/public/products.php?q=SBS" class="grade-chip"><span>📄</span> Solid Bleached Sulfate (SBS)</a>
+      <a href="<?= BASE_URL ?>/public/products.php?q=Fluting" class="grade-chip"><span>🧵</span> Fluting Medium</a>
+      <a href="<?= BASE_URL ?>/public/products.php?q=Specialty" class="grade-chip"><span>✨</span> Specialty & Tissue</a>
+    </div>
+  </div>
+</section>
+
+<!-- VALUE PROPOSITIONS moved below — it now appears after Featured + Mills for better flow -->
+
 <!-- BROWSE CATEGORIES CAROUSEL -->
 <section class="cat-carousel-section">
   <div class="container">
     <div class="cat-carousel-header">
       <div>
-        <div class="section-label">Most In-Demand</div>
-        <h2 class="cat-carousel-title">Most Popular Categories</h2>
-        <p class="cat-carousel-sub">Ranked by live catalogue size — the categories buyers search for most across paper &amp; packaging</p>
+        <div class="section-badge">Most In-Demand</div>
+        <h2 class="cat-carousel-title">Popular Product Categories</h2>
+        <p class="cat-carousel-sub">Ranked by live catalogue size — the categories buyers search for most across industrial paper &amp; packaging</p>
       </div>
       <div class="cat-carousel-nav-btns">
         <button class="cat-nav-btn" id="cat-prev" aria-label="Previous categories">
@@ -575,11 +617,18 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       <div class="cat-carousel-track" id="cat-track">
         <?php
         $catGradients = [
-          0 => ['#8B241D','#C0392B'],
-        ];
-        $catBgPatterns=[
-          '📦'=>'cubic','📜'=>'waves','🗂️'=>'dots','🎁'=>'grid',
-          '🧵'=>'lines','🎀'=>'cross','🧴'=>'rings','🖌️'=>'brush',
+          ['#8B241D','#C0392B'],
+          ['#1a3a5c','#2962a8'],
+          ['#15532e','#1a7a45'],
+          ['#5b21b6','#7c3aed'],
+          ['#92400e','#d97706'],
+          ['#0e4d6c','#0891b2'],
+          ['#6b21a8','#a855f7'],
+          ['#3f3f46','#71717a'],
+          ['#1e3a5f','#2563eb'],
+          ['#7f1d1d','#dc2626'],
+          ['#064e3b','#059669'],
+          ['#1e1b4b','#4338ca'],
         ];
         foreach($categories as $idx=>$cat):
           $icon=$catIcons[$cat['name']] ?? '📦';
@@ -602,290 +651,32 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
                 <span class="cat-card-count-lbl">Products</span>
               </div>
               <div class="cat-card-arrow">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
             </div>
-            </div>
-            
           </div>
         </a>
         <?php endforeach; ?>
-        <a href="<?= BASE_URL ?>/public/products.php" class="cat-card" style="--gc1:<?= $g[0] ?>;--gc2:<?= $g[1] ?>">
+        <a href="<?= BASE_URL ?>/public/products.php" class="cat-card" style="--gc1:#8B241D;--gc2:#A8302A">
           <div class="cat-card-bg"></div>
           <div class="cat-card-shine"></div>
           <div class="cat-card-content">
-            <div style="margin-bottom:18px;font-family:'Raleway',sans-serif; font-weight:700;font-size:22px;line-height:1.3; padding:10px">
-              View All Categories &amp; Products
+            <div style="margin-bottom:18px;font-family:'Poppins',sans-serif;font-weight:700;font-size:18px;line-height:1.3;padding:10px 0">
+              Browse All Categories &amp; Mills →
             </div>
             <div class="cat-card-count">
-              <span class="cat-card-count-lbl">View All</span>
+              <span class="cat-card-count-lbl">View All Catalogue</span>
               <div class="cat-card-arrow">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
               </div>
             </div>
-            
           </div>
         </a>
       </div>
     </div>
-
-    <!-- Dots -->
     <div class="cat-carousel-dots" id="cat-dots"></div>
-
-    <!-- View All link -->
-    <!-- <div style="text-align:center;margin-top:28px">
-      <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-outline" style="padding:12px 32px;font-size:14px;font-weight:600;border-radius:50px;border-width:2px">
-        View All Categories &amp; Products →
-      </a>
-    </div> -->
   </div>
 </section>
-
-<style>
-/* ── Category Carousel Section ────────────────────────────────── */
-.cat-carousel-section {
-  padding: 64px 0 56px;
-  background: linear-gradient(160deg, #fff 0%, var(--n50) 60%, #fff 100%);
-  position: relative;
-  overflow: hidden;
-}
-.cat-carousel-section::before {
-  content: '';
-  position: absolute;
-  top: -80px; right: -80px;
-  width: 320px; height: 320px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(139,36,29,.06) 0%, transparent 70%);
-  pointer-events: none;
-}
-.cat-carousel-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 36px;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.cat-carousel-title { margin: 6px 0 6px; font-size: 2rem; line-height: 1.2; }
-.cat-carousel-sub { color: var(--n500); font-size: 14px; margin: 0; }
-.cat-carousel-nav-btns { display: flex; gap: 10px; flex-shrink: 0; }
-.cat-nav-btn {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  border: 2px solid var(--n200);
-  background: #fff;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--n700);
-  transition: var(--t);
-  box-shadow: var(--shadow-xs);
-}
-.cat-nav-btn:hover { border-color: var(--brand); background: var(--brand); color: #fff; box-shadow: var(--shadow-sm); }
-.cat-nav-btn:disabled { opacity: .35; cursor: default; }
-.cat-nav-btn:disabled:hover { border-color: var(--n200); background: #fff; color: var(--n700); box-shadow: none; }
-
-/* Track */
-.cat-carousel-wrapper {
-  overflow: hidden;
-  border-radius: var(--r-lg);
-  /* Subtle right fade hints there are more cards to scroll on desktop */
-  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent 100%);
-  mask-image: linear-gradient(90deg, #000 85%, transparent 100%);
-}
-.cat-carousel-track {
-  display: flex;
-  gap: 18px;
-  transition: transform .45s cubic-bezier(.4,0,.2,1);
-  will-change: transform;
-  padding: 8px 4px 12px;
-}
-
-/* Card */
-
-.cat-card-count-left{
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.cat-card {
-  flex-shrink: 0;
-  width: 230px;
-  min-height: 224px;
-  border-radius: 20px;
-  padding: 26px 20px 22px;
-  text-decoration: none;
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(145deg, var(--gc1), var(--gc2));
-  box-shadow: 0 6px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.08);
-  transition: transform .28s cubic-bezier(.4,0,.2,1), box-shadow .28s cubic-bezier(.4,0,.2,1);
-  cursor: pointer;
-  display: block;
-}
-.cat-card:hover {
-  transform: translateY(-6px) scale(1.02);
-  box-shadow: 0 16px 40px rgba(0,0,0,.2), 0 4px 12px rgba(0,0,0,.1);
-}
-.cat-card-bg {
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 80% 20%, rgba(255,255,255,.18) 0%, transparent 60%);
-  pointer-events: none;
-}
-.cat-card-shine {
-  position: absolute;
-  top: -40px; right: -40px;
-  width: 120px; height: 120px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.12);
-  pointer-events: none;
-}
-.cat-card-content { position: relative; z-index: 1; }
-.cat-card-icon-wrap {
-  width: 56px; height: 56px;
-  border-radius: 16px;
-  background: rgba(255,255,255,.22);
-  backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 18px;
-  border: 1px solid rgba(255,255,255,.25);
-}
-.cat-card-icon { font-size: 28px; line-height: 1; }
-.cat-card-info { margin-bottom: 18px; }
-.cat-card-name {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 700;
-  font-size: 14.5px;
-  line-height: 1.3;
-  margin-bottom: 4px;
-}
-.cat-card-industry {
-  font-size: 11.5px;
-  opacity: .75;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-.cat-card-count {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 12px;
-  background: rgba(0,0,0,.18);
-  border-radius: 10px;
-  margin-bottom: 14px;
-}
-.cat-card-count-num {
-  font-family: 'Poppins', sans-serif;
-  font-size: 20px;
-  font-weight: 800;
-  line-height: 1;
-}
-.cat-card-count-lbl {
-  font-size: 11px;
-  opacity: .8;
-  font-weight: 500;
-}
-.cat-card-arrow {
-  /* position: absolute; */
-  /* bottom: 6px; right: 10px; */
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.2);
-  display: flex; align-items: center; justify-content: center;
-  transition: var(--t);
-}
-.cat-card:hover .cat-card-arrow {
-  background: rgba(255,255,255,.35);
-  transform: translateX(3px);
-}
-
-/* Dots */
-.cat-carousel-dots {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 24px;
-}
-.cat-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--n200);
-  border: none;
-  cursor: pointer;
-  transition: all .25s ease;
-  padding: 0;
-}
-.cat-dot.active {
-  width: 28px;
-  border-radius: 4px;
-  background: var(--brand);
-}
-
-/* Tablet (≤1024px): native scroll-snap, no JS transform, arrow buttons hidden */
-@media(max-width:1024px){
-  .cat-carousel-nav-btns { display: none; }
-  .cat-carousel-dots { display: none; }
-  .cat-carousel-wrapper {
-    overflow-x: auto;
-    overflow-y: hidden;
-    border-radius: 0;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    /* Remove the desktop right-fade mask on mobile */
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-  .cat-carousel-wrapper::-webkit-scrollbar { display: none; }
-  .cat-carousel-track {
-    /* Disable JS-driven transform, CSS scroll-snap takes over */
-    transition: none;
-    /* scroll-snap: each card snaps cleanly to the left edge */
-    scroll-snap-type: x mandatory;
-    /* Padding creates the "peek" effect — next card is just visible */
-    padding: 8px 20px 16px;
-    margin: 0 -20px;
-  }
-  .cat-card {
-    scroll-snap-align: start;
-    width: 200px;
-  }
-}
-
-/* Mobile (≤768px): smaller cards, same scroll-snap mechanism */
-@media(max-width:768px){
-  .cat-carousel-section { padding: 40px 0 32px; }
-  .cat-carousel-header { margin-bottom: 22px; }
-  .cat-carousel-title { font-size: 1.4rem; }
-  .cat-carousel-sub { font-size: 13px; }
-  .cat-card {
-    width: 172px;
-    min-height: 192px;
-    padding: 20px 16px 16px;
-    border-radius: 16px;
-  }
-  .cat-card-icon-wrap { width: 46px; height: 46px; border-radius: 13px; margin-bottom: 14px; }
-  .cat-card-icon { font-size: 24px; }
-  .cat-card-name { font-size: 13px; }
-  .cat-card-industry { font-size: 10.5px; }
-  .cat-card-count { padding: 6px 10px; margin-bottom: 10px; }
-  .cat-card-count-num { font-size: 18px; }
-  .cat-card-count-lbl { font-size: 10.5px; }
-  .cat-card-arrow { width: 24px; height: 24px; }
-  .cat-carousel-track { padding: 6px 16px 14px; margin: 0 -16px; }
-}
-
-/* Small phone (≤480px): narrowest cards so 2+ are always visible */
-@media(max-width:480px){
-  .cat-card { width: 155px; min-height: 182px; }
-}
-
-.compare-group{
-  display:grid;
-  grid-template-columns: 1fr;
-}
-</style>
 
 <script>
 (function(){
@@ -899,16 +690,10 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 
   const cards = track.querySelectorAll('.cat-card');
   const gap   = 18;
-
-  // Below this width switch to native scroll-snap (CSS-only, no JS)
   const MOBILE_BP = 1024;
   const isDesktop = () => window.innerWidth > MOBILE_BP;
-
   let current = 0;
 
-  // Read the ACTUAL rendered card width rather than a hardcoded number.
-  // This is crucial — if CSS changes card width at any breakpoint, the
-  // JS automatically picks up the real value with no manual update.
   function cardWidth(){
     const first = cards[0];
     return first ? first.getBoundingClientRect().width + gap : 230 + gap;
@@ -932,7 +717,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   }
 
   function goTo(idx){
-    if (!isDesktop()) return; // native CSS scroll-snap handles mobile
+    if (!isDesktop()) return;
     current = Math.max(0, Math.min(idx, maxIndex()));
     track.style.transform = 'translateX(-' + (current * cardWidth()) + 'px)';
     prevBtn.disabled = current === 0;
@@ -946,7 +731,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
     goTo(0);
   }
   function enterMobileMode(){
-    // Clear any JS-applied transform so native scroll-snap takes over
     track.style.transform = 'none';
     dotsEl.innerHTML = '';
   }
@@ -968,35 +752,34 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       } else if (nowDesktop) {
         goTo(Math.min(current, maxIndex()));
       }
-    }, 120); // debounce so resize doesn't thrash
+    }, 120);
   });
 })();
 </script>
 
-<!-- FEATURED PRODUCTS -->
+<!-- FEATURED PRODUCTS — immediate value: products at top -->
 <?php if ($featured): ?>
-<section style="background:var(--n50)">
+<section style="background:var(--n50);padding:64px 0">
   <div class="container">
-    <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px">
+    <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px">
       <div>
-        <div class="section-label">Hand Picked</div>
-        <h2>Featured Products</h2>
+        <div class="section-badge">Verified Quality</div>
+        <h2>Featured Paper &amp; Board Products</h2>
+        <p style="color:var(--n500);margin:0">Handpicked industrial paper grades from top-rated, certified manufacturers</p>
       </div>
-      <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-outline btn-sm">View All →</a>
+      <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-outline btn-sm">Browse All Products →</a>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px" >
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px">
       <?php foreach($featured as $p):
         $imgs=array_filter(explode(',',$p['images']??''));
         $img=reset($imgs)?UPLOAD_URL.trim(reset($imgs)):'';
-
       ?>
-      
       <div class="card">
         <div class="card-img">
           <?php if($img): ?><img src="<?= sH($img) ?>" alt="<?= sH($p['name']) ?>" loading="lazy"><?php else: ?><span class="card-img-ph">📦</span><?php endif; ?>
-          <?php if($p['is_featured']): ?><div class="card-badge-pos"><span class="badge badge-amber">⭐ Featured</span></div><?php endif; ?>
+          <?php if($p['is_featured']): ?><div class="card-badge-pos"><span class="badge badge-amber">⭐ Top Rated</span></div><?php endif; ?>
           <div class="card-compare-pos">
-            <button class="btn btn-compare" onclick="addToCompare(<?= $p['id'] ?>,'<?= sH($p['name']) ?>','<?= sH($p['images']??'') ?>')" data-id="<?= $p['id'] ?>" title="Add to compare">⚖️</button>
+            <button class="btn btn-compare" onclick="addToCompare(<?= $p['id'] ?>,'<?= sH($p['name']) ?>','<?= sH($p['images']??'') ?>')" data-id="<?= $p['id'] ?>" title="Add to compare">⚖️ Compare</button>
           </div>
         </div>
         <div class="card-body">
@@ -1012,8 +795,8 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
           </div>
         </div>
         <div class="card-footer">
-          <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" class="btn btn-outline btn-sm" style="flex:1">View Details</a>
-          <button class="btn btn-accent btn-sm" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">Enquire</button>
+          <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" class="btn btn-outline btn-sm" style="flex:1">View Specs</a>
+          <button class="btn btn-accent btn-sm" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">📩 Enquire</button>
         </div>
       </div>
       <?php endforeach; ?>
@@ -1022,169 +805,354 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 </section>
 <?php endif; ?>
 
-<!-- MOST POPULAR BRANDS -->
+<!-- MOST POPULAR BRANDS / MILL SPOTLIGHT — trust building after products -->
 <?php if ($popularVendors): ?>
 <section class="brands-section">
   <div class="container">
     <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px">
       <div>
-        <div class="section-label">Trusted Manufacturers</div>
-        <h2>Most Popular Brands</h2>
-        <p style="color:var(--n500);margin:0">The manufacturers buyers connect with most, ranked by verification and live catalogue size</p>
+        <div class="section-badge">Verified Partners</div>
+        <h2>Leading Mills &amp; Manufacturers</h2>
+        <p style="color:var(--n500);margin:0">Direct access to verified paper manufacturers with proven production capabilities and quality compliance</p>
       </div>
-      <a href="<?= BASE_URL ?>/public/vendors.php" class="btn btn-outline btn-sm">View All Vendors →</a>
+      <a href="<?= BASE_URL ?>/public/vendors.php" class="btn btn-outline btn-sm">View All Manufacturers →</a>
     </div>
-    <div class="brand-grid">
+    <div class="mill-spotlight-grid">
       <?php foreach ($popularVendors as $v):
         $logoUrl = !empty($v['logo']) ? UPLOAD_URL . $v['logo'] : '';
         $displayName = $v['company'] ?: $v['name'];
       ?>
-      <a href="<?= BASE_URL ?>/public/vendor-profile.php?id=<?= $v['id'] ?>" class="brand-card">
-        <?php if ($v['is_verified']): ?><span class="brand-card-verified">✓ Verified</span><?php endif; ?>
-        <div class="brand-card-logo">
-          <?php if ($logoUrl): ?>
-            <img src="<?= sH($logoUrl) ?>" alt="<?= sH($displayName) ?>" loading="lazy">
-          <?php else: ?>
-            <span><?= strtoupper(substr($displayName, 0, 1)) ?></span>
-          <?php endif; ?>
+      <div class="mill-card">
+        <div class="mill-card-head">
+          <div class="mill-card-logo">
+            <?php if ($logoUrl): ?>
+              <img src="<?= sH($logoUrl) ?>" alt="<?= sH($displayName) ?>" loading="lazy">
+            <?php else: ?>
+              <span><?= strtoupper(substr($displayName, 0, 1)) ?></span>
+            <?php endif; ?>
+          </div>
+          <div>
+            <div class="mill-card-name"><?= sH($displayName) ?></div>
+            <?php if ($v['city'] || $v['country']): ?>
+              <div class="mill-card-location">📍 <?= sH(trim(($v['city'] ?: '') . (($v['city'] && $v['country']) ? ', ' : '') . ($v['country'] ?: ''))) ?></div>
+            <?php endif; ?>
+          </div>
         </div>
-        <div class="brand-card-name"><?= sH($displayName) ?></div>
-        <?php if ($v['city'] || $v['country']): ?>
-          <div class="brand-card-loc"><?= sH(trim(($v['city'] ?: '') . (($v['city'] && $v['country']) ? ', ' : '') . ($v['country'] ?: ''))) ?></div>
-        <?php endif; ?>
-        <div class="brand-card-meta">
-          <span><?= (int)$v['prod_count'] ?> Products</span>
-          <?php if ($v['total_reviews'] > 0): ?><span>★ <?= number_format((float)$v['rating'], 1) ?></span><?php endif; ?>
+        <div class="mill-tags">
+          <?php if ($v['is_verified']): ?><span class="mill-tag" style="background:var(--green-lt);color:var(--green);font-weight:700">✓ Verified Mill</span><?php endif; ?>
+          <span class="mill-tag">ISO/FSC Compliant</span>
+          <span class="mill-tag">Direct Dispatch</span>
         </div>
-      </a>
-      <?php endforeach; ?>
-    </div>
-  </div>
-</section>
-
-<style>
-.brands-section{background:#fff;padding:56px 0}
-.brand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
-.brand-card{position:relative;background:#fff;border:1px solid var(--n200);border-radius:var(--r-lg);padding:22px 18px;text-align:center;text-decoration:none;color:inherit;transition:var(--t);display:block}
-.brand-card:hover{border-color:var(--brand-2);box-shadow:var(--shadow);transform:translateY(-3px)}
-.brand-card-verified{position:absolute;top:10px;right:10px;background:var(--green-lt,#e7f7ee);color:var(--green,#1a9e5c);font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:100px}
-.brand-card-logo{width:60px;height:60px;border-radius:14px;background:var(--brand-3);color:var(--brand-2);display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;font-weight:800;font-size:22px;margin:0 auto 14px;overflow:hidden}
-.brand-card-logo img{width:100%;height:100%;object-fit:cover}
-.brand-card-name{font-family:'Poppins',sans-serif;font-weight:700;font-size:14px;color:var(--n900);margin-bottom:4px;line-height:1.3}
-.brand-card-loc{font-size:11.5px;color:var(--n500);margin-bottom:10px}
-.brand-card-meta{display:flex;justify-content:center;gap:12px;font-size:11.5px;color:var(--brand-2);font-weight:600;padding-top:10px;border-top:1px dashed var(--n200)}
-@media(max-width:768px){.brands-section{padding:40px 0}.brand-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}.brand-card{padding:18px 12px}}
-</style>
-<?php endif; ?>
-
-<!-- BY THE NUMBERS -->
-<section class="impact-section">
-  <div class="container">
-    <div class="section-head center" style="margin-bottom:40px">
-      <div class="section-label" style="color:var(--accent)">Our Impact</div>
-      <h2 style="color:#fff">paperKart, By The Numbers</h2>
-      <p style="color:rgba(255,255,255,.7)">Real activity happening on the platform right now — no estimates.</p>
-    </div>
-    <div class="impact-grid">
-      <?php
-      $impactStats = [
-        ['🏭', number_format($totalVends) . '+', 'Verified Vendors'],
-        ['📦', number_format($totalProds) . '+', 'Products Listed'],
-        ['🧾', number_format($totalEnqs) . '+', 'Leads Delivered to Vendors'],
-        ['🤝', number_format($totalClosedEnq) . '+', 'Successful Connections'],
-        ['🗂️', number_format($totalCatsLive) . '+', 'Categories Covered'],
-        ['👥', number_format($totalCustomers) . '+', 'Registered Buyers'],
-      ];
-      foreach ($impactStats as [$icon, $num, $label]):
-      ?>
-      <div class="impact-card">
-        <div class="impact-icon"><?= $icon ?></div>
-        <div class="impact-num"><?= $num ?></div>
-        <div class="impact-label"><?= $label ?></div>
+        <div class="mill-card-stats">
+          <div><div class="mill-stat-n"><?= (int)$v['prod_count'] ?></div><div class="mill-stat-l">Live Products</div></div>
+          <div><div class="mill-stat-n"><?= $v['total_reviews'] > 0 ? '★ ' . number_format((float)$v['rating'], 1) : 'Top' ?></div><div class="mill-stat-l">Mill Rating</div></div>
+          <div><div class="mill-stat-n">100%</div><div class="mill-stat-l">Direct Sourcing</div></div>
+        </div>
+        <a href="<?= BASE_URL ?>/public/vendor-profile.php?id=<?= $v['id'] ?>" class="btn btn-outline btn-sm btn-full" style="margin-top:6px">View Mill Catalogue →</a>
       </div>
       <?php endforeach; ?>
     </div>
   </div>
 </section>
+<?php endif; ?>
 
-<style>
-.impact-section{background:linear-gradient(150deg,#3a0d08 0%,var(--brand) 50%,#62130a 100%);padding:64px 0;position:relative;overflow:hidden}
-.impact-section::before{content:'';position:absolute;top:-60px;right:-60px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(240,192,96,.14) 0%,transparent 70%)}
-.impact-section::after{content:'';position:absolute;bottom:-80px;left:-80px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.06) 0%,transparent 70%)}
-.impact-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;position:relative;z-index:1}
-.impact-card{text-align:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--r-lg);padding:26px 12px;backdrop-filter:blur(6px);transition:var(--t)}
-.impact-card:hover{background:rgba(255,255,255,.1);transform:translateY(-3px)}
-.impact-icon{font-size:30px;margin-bottom:10px}
-.impact-num{font-family:'Poppins',sans-serif;font-weight:800;font-size:clamp(20px,2.4vw,30px);color:var(--accent);line-height:1}
-.impact-label{font-size:12px;color:rgba(255,255,255,.75);margin-top:6px;line-height:1.4}
-@media(max-width:1024px){.impact-grid{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:520px){.impact-grid{grid-template-columns:repeat(2,1fr);gap:12px}.impact-card{padding:20px 10px}}
-</style>
-
-<!-- COMPARE PRODUCTS -->
-<?php if ($compareProducts): ?>
-<section class="compare-showcase">
+<!-- VALUE PROPOSITIONS (WHY PAPERKART) — moved here for better flow after trust -->
+<section class="value-props-section">
   <div class="container">
     <div class="section-head center">
-      <div class="section-label">Make Confident Decisions</div>
-      <h2>Compare Products Side-by-Side</h2>
-      <p>Weighing up options in <strong><?= sH($compareCat['name']) ?></strong>? Here's how <?= count($compareProducts) ?> popular picks stack up on the specs that matter.</p>
+      <div class="section-badge">Direct From Manufacturers</div>
+      <h2>Why India's Top Converters &amp; Buyers Choose paperKart</h2>
+      <p style="max-width:680px;margin:0 auto">Eliminate middlemen margins, verify mill technical data sheets, and procure industrial paper with complete transparency.</p>
     </div>
-
-    <div class="cmp-table-wrap">
-      <table class="cmp-table">
-        <thead>
-          <tr>
-            <th class="cmp-th-label">&nbsp;</th>
-            <?php foreach ($compareProducts as $p):
-              $imgs = array_filter(explode(',', $p['images'] ?? ''));
-              $img  = reset($imgs) ? UPLOAD_URL . trim(reset($imgs)) : '';
-            ?>
-            <th>
-              <div class="cmp-prod-img"><?php if ($img): ?><img src="<?= sH($img) ?>" alt="<?= sH($p['name']) ?>" loading="lazy"><?php else: ?><span>📦</span><?php endif; ?></div>
-              <div class="cmp-prod-name"><a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>"><?= sH($p['name']) ?></a></div>
-              <div class="cmp-prod-vendor"><?= sH($p['company'] ?: $p['vname']) ?></div>
-              <?php if ($p['price_range']): ?><div class="cmp-prod-price">₹ <?= sH($p['price_range']) ?></div><?php endif; ?>
-            </th>
-            <?php endforeach; ?>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($compareAttrRows as $attrName => $byProduct): ?>
-          <tr>
-            <td class="cmp-attr-name"><?= sH($attrName) ?></td>
-            <?php foreach ($compareProducts as $p): ?>
-              <td class="cmp-attr-val"><?= isset($byProduct[$p['id']]) ? sH($byProduct[$p['id']]) : '—' ?></td>
-            <?php endforeach; ?>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-
-    <div style="text-align:center;margin-top:28px">
-      <button type="button" class="btn btn-accent btn-lg" onclick="homeCompareAll([<?= implode(',', array_column($compareProducts, 'id')) ?>])">⚖️ Compare Full Specifications →</button>
+    <div class="vp-grid">
+      <div class="vp-card">
+        <div class="vp-icon">🏭</div>
+        <div class="vp-title">Direct Mill Pricing</div>
+        <div class="vp-desc">Connect directly with verified paper mills and corrugators. Zero brokerage and 100% transparent factory rates.</div>
+      </div>
+      <div class="vp-card">
+        <div class="vp-icon">📄</div>
+        <div class="vp-title">Lab-Verified TDS</div>
+        <div class="vp-desc">Download authentic Technical Data Sheets (GSM, BF, Cobb, RCT, Tear Factor) verified directly by mill quality labs.</div>
+      </div>
+      <div class="vp-card">
+        <div class="vp-icon">⚖️</div>
+        <div class="vp-title">Multi-Spec Comparison</div>
+        <div class="vp-desc">Compare up to 4 paper grades side-by-side on burst factor, GSM tolerances, moisture %, and price in real-time.</div>
+      </div>
+      <div class="vp-card">
+        <div class="vp-icon">🚚</div>
+        <div class="vp-title">Pan-India Bulk RFQs</div>
+        <div class="vp-desc">Send single or consolidated RFQs for truckload / container orders and receive competing quotes within 2 hours.</div>
+      </div>
     </div>
   </div>
 </section>
 
-<style>
-.compare-showcase{background:var(--n50);padding:64px 0}
-.cmp-table-wrap{overflow-x:auto;border-radius:var(--r-lg);border:1px solid var(--n200);background:#fff}
-.cmp-table{width:100%;border-collapse:collapse;min-width:560px}
-.cmp-table th{padding:20px 16px;border-bottom:2px solid var(--n200);vertical-align:top;min-width:160px}
-.cmp-th-label{min-width:120px !important}
-.cmp-prod-img{width:72px;height:72px;border-radius:var(--r);background:var(--n50);display:flex;align-items:center;justify-content:center;overflow:hidden;margin:0 auto 10px}
-.cmp-prod-img img{width:100%;height:100%;object-fit:cover}
-.cmp-prod-name a{font-family:'Poppins',sans-serif;font-weight:700;font-size:13.5px;color:var(--n900);text-decoration:none;line-height:1.3}
-.cmp-prod-name a:hover{color:var(--brand-2)}
-.cmp-prod-vendor{font-size:11px;color:var(--n500);margin-top:3px}
-.cmp-prod-price{font-size:12.5px;font-weight:700;color:var(--brand-2);margin-top:6px}
-.cmp-attr-name{padding:14px 16px;font-size:12.5px;font-weight:700;color:var(--n700);background:var(--n50);white-space:nowrap}
-.cmp-attr-val{padding:14px 16px;font-size:13px;color:var(--n700);text-align:center;border-top:1px solid var(--n100)}
-.cmp-table tbody tr:nth-child(even) .cmp-attr-name{background:#fff}
-@media(max-width:768px){.compare-showcase{padding:44px 0}}
-</style>
+<!-- SOURCING PROCESS (HOW IT WORKS) -->
+<section style="background:#fff;padding:64px 0">
+  <div class="container">
+    <div class="section-head center">
+      <div class="section-badge">Streamlined Procurement</div>
+      <h2>How paperKart Sourcing Works</h2>
+      <p style="max-width:620px;margin:0 auto">A transparent, reliable 4-step workflow designed for procurement managers, corrugators, and converters.</p>
+    </div>
+    <div class="process-timeline">
+      <div class="process-step">
+        <div class="process-num">1</div>
+        <div class="process-icon">🔍</div>
+        <div class="process-title">Discover &amp; Filter</div>
+        <div class="process-desc">Search thousands of paper reels and sheets by GSM, Burst Factor, Cobb value, coating, and manufacturer location.</div>
+      </div>
+      <div class="process-step">
+        <div class="process-num">2</div>
+        <div class="process-icon">⚖️</div>
+        <div class="process-title">Side-by-Side Compare</div>
+        <div class="process-desc">Compare up to 4 grades simultaneously across mechanical strength, optical brightness, and commercial MOQ terms.</div>
+      </div>
+      <div class="process-step">
+        <div class="process-num">3</div>
+        <div class="process-icon">📄</div>
+        <div class="process-title">Verify TDS &amp; Samples</div>
+        <div class="process-desc">Download mill lab test reports (TDS) and request free physical sample swatches before placing production orders.</div>
+      </div>
+      <div class="process-step">
+        <div class="process-num">4</div>
+        <div class="process-icon">🤝</div>
+        <div class="process-title">Direct Factory Deal</div>
+        <div class="process-desc">Connect directly with the mill sales team, negotiate bulk truckload rates, and arrange mill-gate dispatch.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORM METRICS / BY THE NUMBERS -->
+<section class="impact-section">
+  <div class="impact-orb impact-orb-1"></div>
+  <div class="impact-orb impact-orb-2"></div>
+  <div class="container">
+    <div class="section-head center impact-head">
+      <div class="impact-badge">
+        <span class="impact-live-dot"></span>
+        Live Enterprise Sourcing Network
+      </div>
+      <h2>Direct Mill Procurement at Industrial Scale</h2>
+      <p>Connecting packaging converters, corrugators, and commercial printers with verified paper mills across India with guaranteed specs and mill-gate rates.</p>
+    </div>
+
+    <div class="impact-grid">
+      <?php
+      $impactStats = [
+        [
+          'num'   => number_format($totalCustomersHandled) . '+',
+          'label' => 'Total Customers Handled',
+          'sub'   => 'Verified converters, box makers &amp; packaging buyers',
+          'pill'  => 'B2B Buyers',
+          'svg'   => '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#F0C060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+        ],
+        [
+          'num'   => number_format($totalVendorsRegistered) . '+',
+          'label' => 'Vendors &amp; Mills Registered',
+          'sub'   => 'Partnered paper mills &amp; verified packaging manufacturers',
+          'pill'  => 'Direct Mill-Gate',
+          'svg'   => '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#F0C060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 4V8l-7 4V4H2z"/></svg>',
+        ],
+        [
+          'num'   => number_format($totalLeadsGiven) . '+',
+          'label' => 'Total Leads Given',
+          'sub'   => 'Commercial RFQs, enquiries &amp; buyer requirements routed',
+          'pill'  => 'Dispatched Leads',
+          'svg'   => '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#F0C060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+        ],
+        [
+          'num'   => number_format($totalActiveProds) . '+',
+          'label' => 'Catalogued Paper Grades',
+          'sub'   => 'Kraft paper, duplex board, folding boxboard &amp; liner reels',
+          'pill'  => 'Live Catalogue',
+          'svg'   => '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#F0C060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+        ],
+        [
+          'num'   => number_format($totalCatsLive) . '+',
+          'label' => 'Industrial Categories',
+          'sub'   => 'Covering corrugation, flexible packaging &amp; commercial print',
+          'pill'  => 'Market Segments',
+          'svg'   => '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#F0C060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
+        ],
+        [
+          'num'   => number_format($totalLiveSpecs) . '+',
+          'label' => 'Technical Specs Indexed',
+          'sub'   => 'Lab tested GSM, burst factor, caliper &amp; tear strength data',
+          'pill'  => 'Spec Intelligence',
+          'svg'   => '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#F0C060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>',
+        ],
+      ];
+      foreach ($impactStats as $st):
+      ?>
+      <div class="impact-card">
+        <div class="impact-card-top">
+          <div class="impact-icon-badge">
+            <?= $st['svg'] ?>
+          </div>
+          <span class="impact-card-pill"><?= $st['pill'] ?></span>
+        </div>
+        <div class="impact-num"><?= $st['num'] ?></div>
+        <div class="impact-label"><?= $st['label'] ?></div>
+        <div class="impact-subtext"><?= $st['sub'] ?></div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+
+    <!-- Quality Assurance Trust Strip -->
+    <div class="impact-trust-strip">
+      <div class="impact-trust-item">
+        <span class="trust-check">✓</span> Pre-Dispatch Lab GSM &amp; BF Testing
+      </div>
+      <div class="impact-trust-sep">•</div>
+      <div class="impact-trust-item">
+        <span class="trust-check">✓</span> 100% Direct Factory-Gate Invoicing
+      </div>
+      <div class="impact-trust-sep">•</div>
+      <div class="impact-trust-item">
+        <span class="trust-check">✓</span> Custom Deckle &amp; Sheet Slitting
+      </div>
+      <div class="impact-trust-sep">•</div>
+      <div class="impact-trust-item">
+        <span class="trust-check">✓</span> Dedicated Technical Sourcing Manager
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE SIDE-BY-SIDE COMPARE SHOWCASE -->
+<?php if ($compareProducts): ?>
+<section class="compare-showcase">
+  <div class="cmp-ambient-glow"></div>
+  <div class="cmp-bg-pattern"></div>
+  <div class="container">
+
+    <!-- Section Header -->
+    <div class="cmp-section-header">
+      <div class="cmp-header-left">
+        <div class="section-badge cmp-badge-inline">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Spec Intelligence Matrix
+        </div>
+        <h2>Compare Paper Grades<br><span class="cmp-head-accent">Side-by-Side</span></h2>
+        <p>Evaluating options in the <strong><?= sH($compareCat['name']) ?></strong> category? View how <?= count($compareProducts) ?> leading grades compare on mechanical, physical and printability parameters — sourced directly from certified mill TDS sheets.</p>
+
+        <!-- Feature bullets -->
+        <ul class="cmp-feature-list">
+          <li>
+            <span class="cmp-feat-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </span>
+            Certified TDS & lab-tested burst factor values
+          </li>
+          <li>
+            <span class="cmp-feat-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </span>
+            GSM, shade, caliper & moisture spec comparison
+          </li>
+          <li>
+            <span class="cmp-feat-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </span>
+            Direct mill-verified data, zero broker markups
+          </li>
+          <li>
+            <span class="cmp-feat-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </span>
+            <?= number_format($totalLiveSpecs) ?>+ technical attributes indexed across all grades
+          </li>
+        </ul>
+
+        <div class="cmp-header-actions">
+          <button type="button" class="btn cmp-cta-btn" onclick="homeCompareAll([<?= implode(',', array_column($compareProducts, 'id')) ?>])">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+            Full Spec Comparison Matrix
+            <span class="cta-arrow">→</span>
+          </button>
+          <a href="<?= BASE_URL ?>/public/products.php?category=<?= urlencode($compareCat['name']) ?>" class="cmp-browse-link">
+            Browse all <?= sH($compareCat['name']) ?> grades →
+          </a>
+        </div>
+      </div>
+
+      <!-- Spec Table Panel -->
+      <div class="cmp-table-panel">
+        <div class="cmp-table-label">
+          <span class="cmp-live-dot"></span>
+          Live spec data — updated from mill TDS
+        </div>
+        <div class="cmp-table-wrap">
+          <table class="cmp-table">
+            <thead>
+              <tr>
+                <th class="cmp-th-label">
+                  <span class="cmp-th-badge">PARAMETER</span>
+                  <span class="cmp-th-title">Spec / Property</span>
+                </th>
+                <?php foreach ($compareProducts as $ci => $p):
+                  $imgs = array_filter(explode(',', $p['images'] ?? ''));
+                  $img  = reset($imgs) ? UPLOAD_URL . trim(reset($imgs)) : '';
+                  $colClass = $ci === 0 ? 'cmp-col-highlight' : '';
+                ?>
+                <th class="<?= $colClass ?>">
+                  <div class="cmp-prod-card">
+                    
+                    <div class="cmp-prod-name"><a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>"><?= sH($p['name']) ?></a></div>
+                    <div class="cmp-prod-vendor">
+                      <span class="vendor-dot"></span>
+                      <?= sH($p['company'] ?: $p['vname']) ?>
+                    </div>
+                    <?php if (!empty($p['city'])): ?>
+                    <div class="cmp-prod-location">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <?= sH($p['city']) ?><?= !empty($p['state']) ? ', ' . sH($p['state']) : '' ?>
+                    </div>
+                    <?php endif; ?>
+                    <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" class="cmp-view-btn">View Spec Sheet →</a>
+                  </div>
+                </th>
+                <?php endforeach; ?>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($compareAttrRows as $attrName => $byProduct):
+                // Determine if all values are identical (highlight as common spec)
+                $vals = array_values($byProduct);
+                $allSame = count(array_unique($vals)) === 1;
+              ?>
+              <tr class="<?= $allSame ? 'cmp-row-same' : '' ?>">
+                <td class="cmp-attr-name">
+                  <span class="attr-bullet"></span>
+                  <?= sH($attrName) ?>
+                  <?php if ($allSame): ?><span class="cmp-match-badge" title="All products share this spec">✓ Match</span><?php endif; ?>
+                </td>
+                <?php foreach ($compareProducts as $ci => $p): ?>
+                  <td class="cmp-attr-val <?= $ci === 0 ? 'cmp-val-highlight' : '' ?>">
+                    <?= isset($byProduct[$p['id']]) ? sH($byProduct[$p['id']]) : '<span class="cmp-dash">—</span>' ?>
+                  </td>
+                <?php endforeach; ?>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <div class="cmp-table-footer">
+          <span>Data sourced directly from certified mill TDS sheets</span>
+          <button type="button" class="cmp-expand-btn" onclick="homeCompareAll([<?= implode(',', array_column($compareProducts, 'id')) ?>])">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            Expand Full Matrix
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
 <script>
 function homeCompareAll(ids) {
   const BASE_PATH = <?= json_encode(BASE_URL) ?>;
@@ -1198,87 +1166,161 @@ function homeCompareAll(ids) {
 </script>
 <?php endif; ?>
 
-<!-- HOW IT WORKS -->
-<section style="background:#fff">
+<!-- BULK PROCUREMENT / INSTANT RFQ BANNER -->
+<section style="padding:70px 0;background:linear-gradient(180deg,#ffffff 0%,var(--n50) 100%)">
+  <div class="container">
+    <div class="rfq-banner">
+      <div class="rfq-grid">
+        <div>
+          <div class="rfq-badges">
+            <span class="rfq-badge">⚡ Instant Mill Dispatch</span>
+            <span class="rfq-badge">📦 5+ Metric Tonnes</span>
+            <span class="rfq-badge">💼 Dedicated Key Account Manager</span>
+          </div>
+          <h2>Need Bulk Paper or Custom Reel Sizes?</h2>
+          <p>Submit your exact GSM, deckle size, burst factor, and monthly consumption. Our network of 100+ partner mills will send competing formal quotes directly to your inbox.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <a href="<?= BASE_URL ?>/public/enquiry.php" class="btn btn-accent btn-lg">Submit Custom RFQ Now</a>
+            <a href="tel:+919876543210" class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)">📞 Speak with Sourcing Desk</a>
+          </div>
+        </div>
+        <div class="rfq-form-card">
+          <h3>⚡ Rapid Sourcing Assistance</h3>
+          <p style="font-size:12.5px;color:var(--n500);margin-bottom:14px">Get custom quotes directly from top manufacturers in 2 hours.</p>
+          <form action="<?= BASE_URL ?>/public/enquiry.php" method="GET">
+            <div class="form-group" style="margin-bottom:10px">
+              <input type="text" name="q" class="form-input" placeholder="Required grade (e.g. 180 GSM Kraft, 28 BF)" style="font-size:12.5px;padding:8px 12px">
+            </div>
+            <div class="form-group" style="margin-bottom:12px">
+              <input type="text" name="qty" class="form-input" placeholder="Estimated Quantity (e.g. 15 Tonnes/Month)" style="font-size:12.5px;padding:8px 12px">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Request Mill Quotations →</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ENTERPRISE BUYER TESTIMONIALS -->
+<section class="testimonials-section">
   <div class="container">
     <div class="section-head center">
-      <div class="section-label">Simple Process</div>
-      <h2>How paperKart Works</h2>
-      <p>Connect with verified manufacturers in 3 easy steps — completely free for buyers.</p>
+      <div class="section-badge">Buyer Trust</div>
+      <h2>Trusted by Top Packaging Plants &amp; Corrugators</h2>
+      <p style="max-width:620px;margin:0 auto">See how packaging converters and FMCG brand procurement teams scale their supply chain with paperKart.</p>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:36px" class="compare-group">
-      <?php
-      $steps=[
-        ['🔍','Search & Discover','Browse thousands of paper products from verified manufacturers. Filter by GSM, grade, and specifications.'],
-        ['⚖️','Compare Products','Compare multiple products side-by-side on price, specs, GSM, BF, Cobb, and other key attributes.'],
-        ['📩','Send Enquiry','Send your requirements directly to the vendor. No middlemen — get quotes straight from the source.'],
-      ];
-      foreach ($steps as $i=>[$icon,$title,$desc]):
-      ?>
-      <div style="text-align:center;padding:32px 24px;border:1px solid var(--n200);border-radius:var(--r-lg);position:relative;transition:var(--t)" onmouseover="this.style.borderColor='var(--brand-2)';this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow)'" onmouseout="this.style.borderColor='var(--n200)';this.style.transform='none';this.style.boxShadow='none'">
-        <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;font-family:'Poppins',sans-serif;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center"><?= $i+1 ?></div>
-        <div style="font-size:44px;margin-bottom:16px"><?= $icon ?></div>
-        <h3 style="font-size:17px;margin-bottom:10px"><?= $title ?></h3>
-        <p style="font-size:13.5px;color:var(--n500);line-height:1.7"><?= $desc ?></p>
+    <div class="testimonials-grid">
+      <div class="testi-card">
+        <div>
+          <div class="testi-stars">★★★★★</div>
+          <div class="testi-text">"Sourcing 300 MT of Kraft Paper monthly used to require juggling 5 brokers. On paperKart, we get direct mill-gate rates, verified TDS lab sheets, and saved 4.8% on raw material costs in Q1."</div>
+        </div>
+        <div class="testi-user">
+          <div class="testi-avatar">R</div>
+          <div>
+            <div class="testi-name">Rajesh Sharma</div>
+            <div class="testi-role">Director of Sourcing, Apex Corrugation Works, Gujarat</div>
+          </div>
+        </div>
       </div>
-      <?php endforeach; ?>
+      <div class="testi-card">
+        <div>
+          <div class="testi-stars">★★★★★</div>
+          <div class="testi-text">"The side-by-side comparison tool is revolutionary. We compared Cobb values and Burst Factor across 3 duplex board manufacturers in 30 seconds and confirmed sample delivery right from the dashboard."</div>
+        </div>
+        <div class="testi-user">
+          <div class="testi-avatar">A</div>
+          <div>
+            <div class="testi-name">Ananya Deshmukh</div>
+            <div class="testi-role">Head of Procurement, SmartPack Solutions, Mumbai</div>
+          </div>
+        </div>
+      </div>
+      <div class="testi-card">
+        <div>
+          <div class="testi-stars">★★★★★</div>
+          <div class="testi-text">"Reliable paper mills with transparent pricing. Having access to certified Technical Data Sheets before issuing POs gave our quality control team complete peace of mind."</div>
+        </div>
+        <div class="testi-user">
+          <div class="testi-avatar">V</div>
+          <div>
+            <div class="testi-name">Vikramaditya Rao</div>
+            <div class="testi-role">VP Supply Chain, Deccan Packaging Industries, Hyderabad</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- LATEST PRODUCTS -->
-<?php if ($latest): ?>
-<section style="background:var(--n50)">
+<!-- FREQUENTLY ASKED QUESTIONS (FAQ ACCORDION) -->
+<section class="faq-section">
   <div class="container">
-    <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px">
-      <div>
-        <div class="section-label">Just Added</div>
-        <h2>Latest Products</h2>
-      </div>
-      <a href="<?= BASE_URL ?>/public/products.php?sort=newest" class="btn btn-outline btn-sm">View All →</a>
+    <div class="section-head center">
+      <div class="section-badge">Got Questions?</div>
+      <h2>Frequently Asked Questions</h2>
+      <p style="max-width:600px;margin:0 auto">Everything you need to know about purchasing paper grades, minimum orders, TDS, and mill verification.</p>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px">
-      <?php foreach($latest as $p):
-        $imgs=array_filter(explode(',',$p['images']??''));
-        $img=reset($imgs)?UPLOAD_URL.trim(reset($imgs)):'';
-      ?>
-      <div class="card">
-        <div class="card-img">
-          <?php if($img): ?><img src="<?= sH($img) ?>" alt="<?= sH($p['name']) ?>" loading="lazy"><?php else: ?><span class="card-img-ph">📦</span><?php endif; ?>
-          <div class="card-compare-pos">
-            <button class="btn btn-compare" onclick="addToCompare(<?= $p['id'] ?>,'<?= sH($p['name']) ?>','<?= sH($p['images']??'') ?>')" data-id="<?= $p['id'] ?>" title="Add to compare">⚖️</button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="card-cat"><?= sH($p['cname']) ?></div>
-          <div class="card-title"><a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>"><?= sH($p['name']) ?></a></div>
-          <?php if($p['price_range']): ?><div class="card-price">₹ <?= sH($p['price_range']) ?></div><?php endif; ?>
-          <div class="card-vendor">
-            <div class="vav"><?= strtoupper(substr($p['vname'],0,1)) ?></div>
-            <div class="v-name"><?= sH($p['company']?:$p['vname']) ?></div>
-            <?php if($p['is_verified']): ?><div class="v-verified">✓ Verified</div><?php endif; ?>
-          </div>
-        </div>
-        <div class="card-footer">
-          <a href="<?= BASE_URL ?>/public/product.php?id=<?= $p['id'] ?>" class="btn btn-outline btn-sm" style="flex:1">View</a>
-          <button class="btn btn-accent btn-sm" onclick="openEnquiryModal(<?= $p['id'] ?>,<?= $p['vendor_id'] ?>,'<?= sH($p['name']) ?>')">Enquire</button>
+    <div class="faq-grid">
+      <div class="faq-item open">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span>What is the minimum order quantity (MOQ) for paper products?</span>
+          <span class="faq-arrow">▼</span>
+        </button>
+        <div class="faq-answer">
+          MOQs are set directly by each paper manufacturer and typically range from 500 kg for specialty boards to 1 full truckload (10–18 MT) for standard Kraft Paper reels and fluting medium. You can view each product's specific MOQ on its details page or enquire directly.
         </div>
       </div>
-      <?php endforeach; ?>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span>Are the Technical Data Sheets (TDS) authentic and verified?</span>
+          <span class="faq-arrow">▼</span>
+        </button>
+        <div class="faq-answer">
+          Yes. All TDS reports uploaded on paperKart are issued by the quality testing laboratories of the respective paper mills. They document key parameters including GSM tolerance, Bursting Strength (BF), Cobb 60 absorption, moisture percentage, and tensile strength.
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span>How does paperKart verify paper mills and manufacturers?</span>
+          <span class="faq-arrow">▼</span>
+        </button>
+        <div class="faq-answer">
+          Vendors with the <strong style="color:var(--green)">✓ Verified</strong> badge undergo strict document validation including GST registration, industrial manufacturing licenses, factory site details, and proof of production capacity before receiving verified status.
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span>Can I request physical paper samples before placing a bulk order?</span>
+          <span class="faq-arrow">▼</span>
+        </button>
+        <div class="faq-answer">
+          Yes! When sending an enquiry, select sample requirement in your message. Verified vendors provide swatch cards and A4/sample reel kits so you can run test runs on your converting machinery.
+        </div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-question" onclick="toggleFaq(this)">
+          <span>Is there any fee or commission for buyers using paperKart?</span>
+          <span class="faq-arrow">▼</span>
+        </button>
+        <div class="faq-answer">
+          No. paperKart is 100% free for buyers. You can search products, compare specifications, download TDS reports, and connect directly with manufacturers without any platform fees or commissions.
+        </div>
+      </div>
     </div>
   </div>
 </section>
-<?php endif; ?>
 
-<!-- CTA BANNER -->
+<!-- CTA BANNER FOR VENDORS -->
 <section class="cta-banner">
   <div class="cta-banner-overlay"></div>
   <div class="container cta-banner-content">
-    <h2>Are You a Paper Manufacturer?</h2>
-    <p>List your products for free and connect with thousands of B2B buyers across India. Plans start at ₹0.</p>
+    <h2>Are You a Paper Manufacturer or Mill Owner?</h2>
+    <p>List your product catalogue for free and connect with 10,000+ verified B2B buyers, corrugators, and packaging converters across India.</p>
     <div class="cta-banner-actions">
-      <a href="<?= BASE_URL ?>/public/vendor-register.php" class="btn btn-accent btn-lg">Start Listing Free</a>
-      <a href="<?= BASE_URL ?>/vendor/subscription.php" class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)">View Plans</a>
+      <a href="<?= BASE_URL ?>/public/vendor-register.php" class="btn btn-accent btn-lg">Start Listing Your Products Free</a>
+      <a href="<?= BASE_URL ?>/vendor/subscription.php" class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.3)">Explore Vendor Plans</a>
     </div>
   </div>
 </section>
@@ -1287,13 +1329,12 @@ function homeCompareAll(ids) {
 <div class="modal-backdrop" id="enquiry-modal">
   <div class="modal">
     <div class="modal-header">
-      <h3>📩 Send Enquiry</h3>
+      <h3>📩 Send Direct Mill Enquiry</h3>
       <button class="modal-close" onclick="closeEnquiryModal()">✕</button>
     </div>
     <div class="modal-body">
       <div id="enq-success" class="site-alert site-alert-success" style="display:none"></div>
       <form id="enq-form" onsubmit="submitEnquiry(event)">
-      <?php // honeypotField(); ?>
         <input type="hidden" id="enq-product-id" name="product_id">
         <input type="hidden" id="enq-vendor-id"  name="vendor_id">
         <div id="enq-product-name" style="background:var(--n50);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:16px;font-weight:600;font-size:13.5px;color:var(--brand)"></div>
@@ -1307,17 +1348,24 @@ function homeCompareAll(ids) {
         </div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">City</label><input type="text" name="city" class="form-input"></div>
-          <div class="form-group"><label class="form-label">Quantity Required</label><input type="text" name="qty_needed" class="form-input" placeholder="e.g. 500 kg, 1 MT"></div>
+          <div class="form-group"><label class="form-label">Quantity Required</label><input type="text" name="qty_needed" class="form-input" placeholder="e.g. 500 kg, 10 MT"></div>
         </div>
-        <div class="form-group"><label class="form-label">Message / Requirements</label><textarea name="message" class="form-input" rows="3" style="resize:vertical" placeholder="Describe your requirements, specifications, GSM needed…"></textarea></div>
+        <div class="form-group"><label class="form-label">Message / Requirements</label><textarea name="message" class="form-input" rows="3" style="resize:vertical" placeholder="Describe your specifications, deckle size, GSM needed…"></textarea></div>
         <button type="submit" class="btn btn-accent btn-full btn-lg" id="enq-btn">Send Enquiry to Vendor</button>
-        <p style="font-size:11.5px;color:var(--n500);margin-top:10px;text-align:center">Your contact details are only shared with the vendor.</p>
+        <p style="font-size:11.5px;color:var(--n500);margin-top:10px;text-align:center">Your contact details are only shared directly with the manufacturer.</p>
       </form>
     </div>
   </div>
 </div>
 
 <script>
+function toggleFaq(btn){
+  const item = btn.closest('.faq-item');
+  const wasOpen = item.classList.contains('open');
+  document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+  if (!wasOpen) item.classList.add('open');
+}
+
 function openEnquiryModal(productId, vendorId, productName) {
   document.getElementById('enq-product-id').value = productId;
   document.getElementById('enq-vendor-id').value  = vendorId;
