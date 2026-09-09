@@ -117,19 +117,12 @@ section.compact{padding:40px 0}
   width:100%;
   overflow:hidden;
   background:var(--n900);
-  /* 8:3 matches the 1600×600 banner image exactly — no crop needed */
+  /* 8:3 matches the 1600×600 banner image perfectly on all screens with zero trimming */
   aspect-ratio:8/3;
-  /* Mobile floor: prevents section collapsing to ~140px on phones */
-  min-height:220px;
-  /* Large-screen ceiling: prevents 720px+ height on 1080p monitors */
-  max-height:680px;
-  /* Contain any child that might try to expand beyond this box */
   contain:layout;
 }
 
-/* SLIDES LAYER: fills the entire stage.
-   Both position:absolute and inset:0 are required — this element must
-   not contribute to document flow so it never fights aspect-ratio. */
+/* SLIDES LAYER: fills the entire stage */
 .ad-slides{
   position:absolute;
   inset:0;
@@ -137,12 +130,7 @@ section.compact{padding:40px 0}
   height:100%;
 }
 
-/* INDIVIDUAL SLIDE IMAGE:
-   object-fit:cover fills the frame completely (no empty space).
-   object-position:center 25% anchors to slightly above center —
-   most banner designs place logos/products in the upper-center area,
-   so this minimises visible content loss on the rare cases where
-   max-height kicks in at large screens. */
+/* INDIVIDUAL SLIDE IMAGE */
 .ad-slide{
   position:absolute;
   inset:0;
@@ -150,9 +138,8 @@ section.compact{padding:40px 0}
   width:100%;
   height:100%;
   object-fit:cover;
-  object-position:center 25%;
+  object-position:center center;
   opacity:0;
-  /* GPU-composited crossfade: only opacity animates, no paint/layout */
   transition:opacity 800ms ease-in-out;
   will-change:opacity;
   backface-visibility:hidden;
@@ -160,111 +147,58 @@ section.compact{padding:40px 0}
 }
 .ad-slide.active{opacity:1}
 
-/* Wraps .ad-stage + the search card so the card can be absolutely
-   positioned (overlay) on desktop but flow as a normal sibling on mobile
-   without being clipped by .ad-stage's own overflow:hidden. */
-.ad-stage-wrap{position:relative !important}
+/* Wraps .ad-stage + search card */
+.ad-stage-wrap{position:relative !important;width:100%}
 
-/* CONTENT OVERLAY: search card + progress bar.
-   Must be position:absolute so it overlays the stage without adding
-   any height to it. The previous position:relative version with an
-   explicit height was fighting the aspect-ratio on some screens. */
+/* CONTENT OVERLAY: search card + progress bar */
 .ad-stage-inner{
   position:absolute;
   inset:0;
   z-index:3;
   display:flex;
   align-items:center;
-  /* No padding here — let the container element handle horizontal padding */
+  pointer-events:none;
 }
-/* The .container inside .ad-stage-inner must fill the full width of the
-   absolutely-positioned overlay, so search card can align to the left
-   edge correctly at all viewport widths. */
 .ad-stage-inner .container{
   width:100%;
+  pointer-events:auto;
 }
 
-/* SEARCH CARD: desktop/laptop only, left-anchored.
-   Uses clamp() so it scales smoothly between 1024px and 1920px.
-   Hidden on tablet and mobile via breakpoint below. */
+/* SEARCH CARD: compact, perfectly fitted for laptop and desktop screens */
 .ad-search-card{
   position:relative;
   z-index:4;
   background:#fff;
-  border-radius:var(--r-lg);
-  box-shadow:0 20px 56px rgba(0,0,0,.32),0 4px 16px rgba(0,0,0,.14);
-  padding:clamp(16px,1.8vw,26px) clamp(14px,1.6vw,24px);
-  width:clamp(270px,22vw,320px);
+  border-radius:var(--r);
+  box-shadow:0 12px 36px rgba(0,0,0,.26), 0 2px 8px rgba(0,0,0,.1);
+  padding:clamp(10px, 1.2vw, 16px) clamp(12px, 1.4vw, 18px);
+  width:clamp(250px, 20vw, 290px);
+  max-width:100%;
   flex-shrink:0;
-}
-/* Localised dark vignette behind the card only.
-   Keeps the white card readable on bright photos without dimming
-   the right-side ad content that buyers actually want to see. */
-.ad-search-card::before{
-  content:'';
-  position:absolute;
-  z-index:-1;
-  inset:-60px -60px -60px -60px;
-  /* background:radial-gradient(ellipse at 28% 35%,rgba(8,4,3,.44) 0%,transparent 65%); */
-  pointer-events:none;
 }
 .ad-search-card h3{
   font-family:'Poppins',sans-serif;
-  font-size:clamp(10px,1vw,14px);
+  font-size:clamp(12px, 1vw, 14px);
   font-weight:700;
   color:var(--n900);
-  margin-bottom:clamp(10px,1.1vw,14px);
+  margin-bottom:clamp(6px, 0.6vw, 10px);
   letter-spacing:-.01em;
 }
-.ad-search-field{
-  width:100%;
-  padding:clamp(6px,0.6vw,7px) 8px;
-  border:1.5px solid var(--n200);
-  border-radius:var(--r-sm);
-  background:var(--n50);
-  color:var(--n900);
-  font-size:clamp(10px,.9vw,10.5px);
-  font-family:'DM Sans',sans-serif;
-  margin-bottom:clamp(6px,0.7vw,9px);
-}
-.ad-search-field:focus{outline:none;border-color:var(--brand-2)}
-.ad-search-submit{
-  width:100%;
-  padding:clamp(6px,0.6vw,8px);
-  background:var(--brand);
-  color:#fff;border:none;
-  border-radius:var(--r-sm);
-  font-size:clamp(10px,.8vw,12px);
-  font-weight:700;cursor:pointer;
-  font-family:'DM Sans',sans-serif;
-  margin-top:2px;
-  transition:background .2s ease,transform .15s ease;
-}
-.ad-search-submit:hover{background:var(--brand-2);transform:translateY(-1px)}
-.ad-search-advanced{
-  display:block;text-align:center;
-  margin-top:clamp(8px,0.9vw,12px);
-  font-size:9px;color:var(--n500);
-  text-decoration:none;font-weight:600;
-}
-.ad-search-advanced:hover{color:var(--brand-2)}
-
-/* Mode toggle: "By Country" / "By Industry" — matches existing brand colors */
 .ad-search-toggle{
   display:flex;
-  gap:8px;
-  margin-bottom:clamp(10px,1.1vw,14px);
+  gap:6px;
+  margin-bottom:clamp(6px, 0.6vw, 10px);
 }
 .ad-search-radio{
   flex:1;
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:6px;
-  padding:clamp(4px,0.4vw,4px) 4px;
+  gap:5px;
+  padding:clamp(3px, 0.35vw, 5px) 4px;
   border:1.5px solid var(--n200);
   border-radius:var(--r-sm);
-  font-size:clamp(9px,0.85vw,10.5px);
+  font-size:clamp(10px, 0.8vw, 11.5px);
   font-weight:600;
   color:var(--n700);
   cursor:pointer;
@@ -274,7 +208,7 @@ section.compact{padding:40px 0}
 }
 .ad-search-radio input{position:absolute;opacity:0;pointer-events:none}
 .ad-search-radio-dot{
-  width:14px;height:14px;flex-shrink:0;
+  width:12px;height:12px;flex-shrink:0;
   border-radius:50%;
   border:1.5px solid var(--n300);
   position:relative;
@@ -282,7 +216,7 @@ section.compact{padding:40px 0}
 }
 .ad-search-radio-dot::after{
   content:'';
-  position:absolute;inset:3px;
+  position:absolute;inset:2px;
   border-radius:50%;
   background:var(--brand);
   transform:scale(0);
@@ -295,6 +229,41 @@ section.compact{padding:40px 0}
 }
 .ad-search-radio:has(input:checked) .ad-search-radio-dot{border-color:var(--brand)}
 .ad-search-radio:has(input:checked) .ad-search-radio-dot::after{transform:scale(1)}
+
+.ad-search-field{
+  width:100%;
+  padding:clamp(4px, 0.45vw, 6px) 8px;
+  border:1.5px solid var(--n200);
+  border-radius:var(--r-sm);
+  background:var(--n50);
+  color:var(--n900);
+  font-size:clamp(10.5px, 0.85vw, 12px);
+  font-family:'DM Sans',sans-serif;
+  margin-bottom:clamp(4px, 0.45vw, 6px);
+  transition:border-color .15s ease;
+}
+.ad-search-field:focus{outline:none;border-color:var(--brand-2);background:#fff}
+.ad-search-submit{
+  width:100%;
+  padding:clamp(6px, 0.55vw, 8px) 10px;
+  background:var(--brand);
+  color:#fff;border:none;
+  border-radius:var(--r-sm);
+  font-size:clamp(11px, 0.85vw, 12.5px);
+  font-weight:700;cursor:pointer;
+  font-family:'DM Sans',sans-serif;
+  margin-top:2px;
+  transition:background .2s ease,transform .15s ease;
+}
+.ad-search-submit:hover{background:var(--brand-2);transform:translateY(-1px)}
+.ad-search-advanced{
+  display:block;text-align:center;
+  margin-top:clamp(4px, 0.5vw, 8px);
+  font-size:clamp(9.5px, 0.75vw, 11px);
+  color:var(--n500);
+  text-decoration:none;font-weight:600;
+}
+.ad-search-advanced:hover{color:var(--brand-2)}
 .as-group{margin-bottom:2px}
 
 /* PROGRESS BAR: absolute bottom edge.
@@ -311,8 +280,9 @@ section.compact{padding:40px 0}
 .ad-progress-inner{
   display:flex;
   align-items:center;
+  justify-content:flex-end;
   gap:12px;
-  padding:0 0 clamp(12px,1.2vw,18px);
+  padding:0 0 clamp(8px,1vw,14px);
 }
 .ad-progress-num{
   font-family:'Poppins',sans-serif;
@@ -339,8 +309,8 @@ section.compact{padding:40px 0}
   border-radius:2px;
 }
 .ad-progress-btn{
-  width:clamp(26px,2.2vw,32px);
-  height:clamp(26px,2.2vw,32px);
+  width:clamp(22px,2vw,30px);
+  height:clamp(22px,2vw,30px);
   border-radius:50%;
   border:1px solid rgba(255,255,255,.25);
   background:rgba(255,255,255,.06);
@@ -351,9 +321,7 @@ section.compact{padding:40px 0}
 }
 .ad-progress-btn:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.45)}
 
-/* FALLBACK HERO: shown when no banners are uploaded yet.
-   Fills the same .ad-stage box (position:absolute, inset:0) so the
-   aspect-ratio sizing still drives section height correctly. */
+/* FALLBACK HERO: shown when no banners are uploaded yet */
 .ad-stage-empty{
   position:absolute;
   inset:0;
@@ -404,84 +372,94 @@ section.compact{padding:40px 0}
 .ov-card-img img{width:100%;height:100%;object-fit:cover}
 
 /* ───────────────────────────────────────────────────────────────
-   BREAKPOINTS — AD STAGE
+   BREAKPOINTS — AD STAGE & SEARCH CARD
    ─────────────────────────────────────────────────────────────── */
 
-/* Search card stays visible on tablet and phone now — it only shows 2
-   fields at a time (mode toggle + cascading dropdowns), so it comfortably
-   fits even on small screens. The 768px block below handles its sizing. */
-
-/* Slightly tighter progress bar on small screens */
-@media(max-width:768px){
-  .ad-progress{padding-top:20px}
-  .ad-progress-inner{gap:8px}
-  .ad-progress-track{max-width:none}
-   .ad-search-advanced{
-    font-size: 8px;
+/* Tablet screens (768px to 1023px): ultra-compact overlay that does not overflow hero */
+@media(min-width:768px) and (max-width:1023px){
+  .ad-stage-inner{
+    position:absolute;
+    inset:0;
+    z-index:3;
+    display:flex;
+    align-items:center;
+    pointer-events:none;
   }
-
-  .ad-search-submit{
-  padding:clamp(9px,0.9vw,12px);
-  font-size:clamp(8px,1vw,14px);
-}
-
-
+  .ad-stage-inner .container{
+    width:100%;
+    pointer-events:auto;
+  }
+  .ad-search-card{
+    width:clamp(200px, 26vw, 230px);
+    padding:7px 9px 5px;
+    border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.22);
+  }
+  .ad-search-card h3{
+    font-size:11px;
+    margin-bottom:3px;
+  }
+  .ad-search-toggle{
+    gap:4px;
+    margin-bottom:3px;
+  }
+  .ad-search-radio{
+    padding:2px 4px;
+    font-size:9px;
+    gap:3px;
+  }
+  .ad-search-radio-dot{
+    width:9px;
+    height:9px;
+  }
+  .ad-search-radio-dot::after{
+    inset:1.5px;
+  }
   .ad-search-field{
-  padding:clamp(5px,0.8vw,11px) 5px;
-  font-size:clamp(8px,1vw,13.5px);
-}
-
-.ad-search-card h3{
-  font-size:clamp(10px,1.3vw,18px);
-}
-
-.ad-search-card{
-  padding:clamp(12px,1.8vw,26px) clamp(10px,1.6vw,24px);
-  width:clamp(200px,22vw,320px);
-}
-
-.ad-search-radio{
-  font-size:clamp(7px,.8vw,9px);
-  padding:clamp(4px,0.4vw,4px) 4px;
-  gap:4px;
-}
-.ad-search-radio-dot{width:11px;height:11px}
-
-/* Un-overlay the card from the hero image on mobile/tablet — the hero
-   banner is quite short here (~180-220px), so overlaying a multi-field
-   card risks it overflowing the image bounds. Letting it flow naturally
-   below the banner instead avoids that entirely, at any content height. */
-/* .ad-stage-inner{
-  position:static;
-  inset:auto;
-  padding:16px 0;
-  background:var(--n50);
-} */
-/* .ad-search-card{
-  box-shadow:0 4px 16px rgba(0,0,0,.10);
-  margin:0 auto;
-  width:100%;
-  max-width:420px;
-} */
-
-.ad-stage-inner{
-    display: none;
+    padding:2px 5px;
+    font-size:9.5px;
+    margin-bottom:2.5px;
+    height:21px;
+  }
+  .ad-search-submit{
+    padding:3px 6px;
+    font-size:10px;
+    margin-top:1px;
+    height:22px;
+  }
+  .ad-search-advanced{
+    font-size:8.5px;
+    margin-top:2px;
+  }
+  .ad-progress{
+    padding-top:14px;
+  }
+  .ad-progress-inner{
+    gap:8px;
+    padding-bottom:6px;
   }
 }
 
-/* Phone: min-height floor is the only override.
-   aspect-ratio:8/3 at 375px gives 141px — too short for a banner.
-   We keep the ratio but enforce a 220px floor so the section
-   has visual presence. object-fit:cover handles any slight mismatch. */
-@media(max-width:480px){
-  .ad-stage{
-    /* Remove max-height cap on phones — it's not needed below 480px
-       (max natural height here is only 180px at 480px wide) */
-    max-height:none;
+/* Mobile screens (<768px): hide search card and center progress controls */
+@media(max-width:767px){
+  .ad-stage-inner{
+    display:none !important;
   }
-  
-  .ad-progress-inner{gap:6px;padding-bottom:10px}
-  .ad-progress-btn{width:24px;height:24px}
+  .ad-progress{
+    padding-top:12px;
+  }
+  .ad-progress-inner{
+    justify-content:center;
+    gap:6px;
+    padding-bottom:6px;
+  }
+  .ad-progress-num{
+    font-size:10px;
+  }
+  .ad-progress-btn{
+    width:22px;
+    height:22px;
+  }
 }
 
 

@@ -243,7 +243,7 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
               <option value="<?= sH($c) ?>"><?= sH($c) ?></option>
             <?php endforeach; ?>
           </select>
-          <select name="vendor" id="asi-brand" class="ad-search-field">
+          <select name="vendor" id="asi-brand" class="ad-search-field as-field-full">
             <option value="">All Brands</option>
             <?php foreach($searchCardVendors as $v): ?>
               <option value="<?= $v['id'] ?>"><?= sH($v['label']) ?></option>
@@ -487,7 +487,22 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 
   // Ensure the hidden mode's fields start correctly disabled (defence
   // against duplicate same-name fields both serializing on submit).
-  asSwitchMode('industry');
+  //
+  // IMPORTANT: don't hardcode 'industry' here. Browsers restore which
+  // radio was checked on back/forward navigation (both bfcache restores
+  // and regular history reloads), and that restoration isn't guaranteed
+  // to happen before this inline script runs — so the toggle pill can
+  // visually show "By Brand" checked while the field groups are still
+  // stuck showing Industry mode. Reading the actually-checked radio (and
+  // re-syncing on every `pageshow`, which fires after the browser has
+  // finished restoring form state) keeps the two in sync no matter how
+  // the page was reached.
+  function asSyncModeFromCheckedRadio(){
+    const checked = document.querySelector('input[name="search-mode"]:checked');
+    asSwitchMode(checked ? checked.value : 'industry');
+  }
+  asSyncModeFromCheckedRadio();
+  window.addEventListener('pageshow', asSyncModeFromCheckedRadio);
 })();
 </script>
 
