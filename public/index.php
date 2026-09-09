@@ -551,8 +551,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   window.addEventListener('pageshow', asInit);
 })();
 </script>
-})();
-</script>
 
 <!-- BROWSE CATEGORIES CAROUSEL -->
 <section class="cat-carousel-section">
