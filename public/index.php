@@ -187,11 +187,11 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       <h3>Find Your Products</h3>
 
       <div class="ad-search-toggle">
-        <label class="ad-search-radio">
+        <label class="ad-search-radio" onclick="asSwitchMode('brand')">
           <input type="radio" name="search-mode" value="brand" onchange="asSwitchMode('brand')">
           <span class="ad-search-radio-dot"></span> By Brand
         </label>
-        <label class="ad-search-radio">
+        <label class="ad-search-radio" onclick="asSwitchMode('industry')">
           <input type="radio" name="search-mode" value="industry" checked onchange="asSwitchMode('industry')">
           <span class="ad-search-radio-dot"></span> By Industry
         </label>
@@ -328,33 +328,40 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
   window.asSwitchMode = function(mode){
     const brandGroup    = document.getElementById('as-group-brand');
     const industryGroup = document.getElementById('as-group-industry');
+    if (!brandGroup || !industryGroup) return;
     const showBrand = mode === 'brand';
+
+    // Synchronize radio input checked states
+    const brandRadio = document.querySelector('input[name="search-mode"][value="brand"]');
+    const indRadio   = document.querySelector('input[name="search-mode"][value="industry"]');
+    if (brandRadio) brandRadio.checked = showBrand;
+    if (indRadio)   indRadio.checked   = !showBrand;
 
     brandGroup.style.display    = showBrand ? 'block' : 'none';
     industryGroup.style.display = showBrand ? 'none'  : 'block';
 
-    // Disable every field in the hidden group (so stale selections never
-    // get submitted alongside the active mode's filters) and re-enable
-    // the visible group. Country/Brand/Industry are independent ("All …"
-    // is a valid choice) — only Category/Type stay gated behind their
-    // parent selection until one is actually made.
+    // Disable every field in the hidden group and enable the visible group
     brandGroup.querySelectorAll('select').forEach(el => el.disabled = !showBrand);
     industryGroup.querySelectorAll('select').forEach(el => el.disabled = showBrand);
 
     if (showBrand) {
-      document.getElementById('asb-category').disabled = !document.getElementById('asb-industry').value;
+      const indVal = document.getElementById('asb-industry')?.value;
+      const catSel = document.getElementById('asb-category');
+      if (catSel) catSel.disabled = !indVal;
     } else {
-      document.getElementById('asi-category').disabled = !document.getElementById('asi-industry').value;
-      document.getElementById('asi-type').disabled = !document.getElementById('asi-category').value;
+      const indVal  = document.getElementById('asi-industry')?.value;
+      const catVal  = document.getElementById('asi-category')?.value;
+      const catSel  = document.getElementById('asi-category');
+      const typeSel = document.getElementById('asi-type');
+      if (catSel) catSel.disabled = !indVal;
+      if (typeSel) typeSel.disabled = !catVal;
     }
   };
 
-  /* ── Brand refresh (shared by both modes) ─────────────────────────
-     Industry mode calls it with whatever industry/category/type/country
-     are currently set; Brand mode calls it with country only (brand
-     comes before industry/category in that mode). */
+  /* ── Brand refresh (shared by both modes) ───────────────────────── */
   function asRefreshBrands(prefix, filters){
     const brandSel = document.getElementById(prefix + '-brand');
+    if (!brandSel) return;
     const params = new URLSearchParams();
     if (filters.industryId) params.set('industry_id', filters.industryId);
     if (filters.categoryId) params.set('category_id', filters.categoryId);
@@ -368,7 +375,6 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       .then(list => {
         brandSel.innerHTML = '<option value="">All Brands</option>' +
           list.map(b => `<option value="${b.id}">${escLbl(b.label)}</option>`).join('');
-        // Keep the previous selection if it's still in the refreshed list.
         if (keepValue && list.some(b => String(b.id) === keepValue)) brandSel.value = keepValue;
       })
       .catch(() => { brandSel.innerHTML = '<option value="">All Brands</option>'; });
@@ -376,15 +382,19 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
 
   /* ── INDUSTRY MODE: Industry → Category → Type → Country → Brand ── */
   window.asOnIndustryChange = function(){
-    const industryId = document.getElementById('asi-industry').value;
+    const indEl = document.getElementById('asi-industry');
     const catSel  = document.getElementById('asi-category');
     const typeSel = document.getElementById('asi-type');
+    if (!indEl || !catSel || !typeSel) return;
+    const industryId = indEl.value;
+
     catSel.innerHTML = '<option value="">Loading…</option>'; catSel.disabled = true;
     typeSel.innerHTML = '<option value="">Select Category first…</option>'; typeSel.disabled = true;
 
     if (!industryId) {
       catSel.innerHTML = '<option value="">Select Industry first…</option>';
     } else {
+      const keepCat = catSel.getAttribute('data-keep') || '';
       fetch(BASE_PATH + '/public/ajax/get-categories-with-products.php?industry_id=' + industryId)
         .then(r => r.json())
         .then(list => {
@@ -392,23 +402,31 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
           catSel.innerHTML = '<option value="">All Categories</option>' +
             list.map(c => `<option value="${c.id}">${escLbl(c.name)}</option>`).join('');
           catSel.disabled = false;
+          if (keepCat && list.some(c => String(c.id) === keepCat)) {
+            catSel.value = keepCat;
+            catSel.removeAttribute('data-keep');
+            asOnCategoryChange();
+          }
         })
         .catch(() => { catSel.innerHTML = '<option value="">Could not load categories</option>'; });
     }
 
     asRefreshBrands('asi', {
-      industryId, country: document.getElementById('asi-country').value
+      industryId, country: document.getElementById('asi-country')?.value || ''
     });
   };
 
   window.asOnCategoryChange = function(){
-    const categoryId = document.getElementById('asi-category').value;
+    const catEl = document.getElementById('asi-category');
     const typeSel = document.getElementById('asi-type');
+    if (!catEl || !typeSel) return;
+    const categoryId = catEl.value;
     typeSel.innerHTML = '<option value="">Loading…</option>'; typeSel.disabled = true;
 
     if (!categoryId) {
       typeSel.innerHTML = '<option value="">Select Category first…</option>';
     } else {
+      const keepType = typeSel.getAttribute('data-keep') || '';
       fetch(BASE_PATH + '/public/ajax/get-product-types-with-products.php?category_id=' + categoryId)
         .then(r => r.json())
         .then(list => {
@@ -416,58 +434,72 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
           typeSel.innerHTML = '<option value="">All Product Types</option>' +
             list.map(t => `<option value="${t.id}">${escLbl(t.name)}</option>`).join('');
           typeSel.disabled = false;
+          if (keepType && list.some(t => String(t.id) === keepType)) {
+            typeSel.value = keepType;
+            typeSel.removeAttribute('data-keep');
+          }
         })
         .catch(() => { typeSel.innerHTML = '<option value="">Could not load product types</option>'; });
     }
 
     asRefreshBrands('asi', {
-      industryId: document.getElementById('asi-industry').value,
+      industryId: document.getElementById('asi-industry')?.value || '',
       categoryId,
-      country: document.getElementById('asi-country').value
+      country: document.getElementById('asi-country')?.value || ''
     });
   };
 
   window.asOnIndustryModeCountryChange = function(){
     asRefreshBrands('asi', {
-      industryId: document.getElementById('asi-industry').value,
-      categoryId: document.getElementById('asi-category').value,
-      typeId: document.getElementById('asi-type').value,
-      country: document.getElementById('asi-country').value
+      industryId: document.getElementById('asi-industry')?.value || '',
+      categoryId: document.getElementById('asi-category')?.value || '',
+      typeId: document.getElementById('asi-type')?.value || '',
+      country: document.getElementById('asi-country')?.value || ''
     });
   };
 
   /* ── BRAND MODE: Country → Brand → Industry → Category ───────────── */
   window.asOnBrandModeCountryChange = function(){
-    asRefreshBrands('asb', { country: document.getElementById('asb-country').value });
+    asRefreshBrands('asb', { country: document.getElementById('asb-country')?.value || '' });
   };
 
   window.asOnBrandModeBrandChange = function(){
-    const vendorId = document.getElementById('asb-brand').value;
+    const brandEl = document.getElementById('asb-brand');
     const indSel = document.getElementById('asb-industry');
     const catSel = document.getElementById('asb-category');
+    if (!brandEl || !indSel || !catSel) return;
+    const vendorId = brandEl.value;
     catSel.innerHTML = '<option value="">All Categories</option>'; catSel.disabled = true;
 
     if (!vendorId) {
-      // "All Brands" — fall back to the full, unscoped industries list.
       indSel.innerHTML = '<option value="">All Industries</option>' +
         ALL_INDUSTRIES.map(i => `<option value="${i.id}">${escLbl(i.name)}</option>`).join('');
       indSel.value = '';
       return;
     }
+    const keepInd = indSel.getAttribute('data-keep') || indSel.value;
     indSel.innerHTML = '<option value="">Loading…</option>';
     fetch(BASE_PATH + '/public/ajax/get-industries-by-vendor.php?vendor_id=' + vendorId)
       .then(r => r.json())
       .then(list => {
         indSel.innerHTML = '<option value="">All Industries</option>' +
           list.map(i => `<option value="${i.id}">${escLbl(i.name)}</option>`).join('');
+        if (keepInd && list.some(i => String(i.id) === keepInd)) {
+          indSel.value = keepInd;
+          indSel.removeAttribute('data-keep');
+          asOnBrandModeIndustryChange();
+        }
       })
       .catch(() => { indSel.innerHTML = '<option value="">Could not load industries</option>'; });
   };
 
   window.asOnBrandModeIndustryChange = function(){
-    const industryId = document.getElementById('asb-industry').value;
-    const vendorId   = document.getElementById('asb-brand').value;
+    const indEl = document.getElementById('asb-industry');
+    const brandEl = document.getElementById('asb-brand');
     const catSel = document.getElementById('asb-category');
+    if (!indEl || !catSel) return;
+    const industryId = indEl.value;
+    const vendorId   = brandEl ? brandEl.value : '';
     catSel.innerHTML = '<option value="">Loading…</option>'; catSel.disabled = true;
 
     if (!industryId) {
@@ -485,9 +517,40 @@ $catIcons=['Corrugated Boxes'=>'📦','Kraft Paper'=>'📜','Duplex Board'=>'�
       .catch(() => { catSel.innerHTML = '<option value="">Could not load categories</option>'; });
   };
 
-  // Ensure the hidden mode's fields start correctly disabled (defence
-  // against duplicate same-name fields both serializing on submit).
-  asSwitchMode('industry');
+  function asInit(){
+    const checkedRadio = document.querySelector('input[name="search-mode"]:checked');
+    const mode = checkedRadio ? checkedRadio.value : 'industry';
+    asSwitchMode(mode);
+
+    // Rehydrate dependent dropdowns if browser preserved form values on back button
+    if (mode === 'brand') {
+      const brandVal = document.getElementById('asb-brand')?.value;
+      const indVal   = document.getElementById('asb-industry')?.value;
+      if (brandVal) {
+        document.getElementById('asb-industry')?.setAttribute('data-keep', indVal);
+        asOnBrandModeBrandChange();
+      } else if (indVal) {
+        asOnBrandModeIndustryChange();
+      }
+    } else {
+      const indVal = document.getElementById('asi-industry')?.value;
+      const catVal = document.getElementById('asi-category')?.value;
+      if (indVal) {
+        document.getElementById('asi-category')?.setAttribute('data-keep', catVal);
+        asOnIndustryChange();
+      }
+    }
+  }
+
+  // Ensure mode matches radio on load and on back navigation / pageshow
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', asInit);
+  } else {
+    asInit();
+  }
+  window.addEventListener('pageshow', asInit);
+})();
+</script>
 })();
 </script>
 
