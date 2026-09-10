@@ -1,14 +1,11 @@
-# Environment / secrets
-.env
-.env.*
-!.env.example
-
 # Private configuration
 config.php
 config.local.php
+.env
+.env.*
+
+# macOS
+.DS_Store
 
 # Logs
 *.log
-
-# OS files
-.DS_Store
