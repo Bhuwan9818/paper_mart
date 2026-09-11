@@ -194,31 +194,43 @@ $industries = $pdo->query(
 ?>
 
 <style>
-/* ── Modern Compare Styles ── */
+/* ── paperKart Theme Compare Styles ── */
 .cmp-hero-section {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(330deg, #62130a 0%, var(--brand) 55%, #A8302A 100%);
   position: relative;
   overflow: hidden;
-  padding: 48px 0 56px;
+  padding: 52px 0 60px;
   color: #fff;
 }
 .cmp-hero-section::before {
   content: '';
   position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(230,81,0,0.15) 0%, transparent 70%);
+  top: -40%;
+  right: -15%;
+  width: 550px;
+  height: 550px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(240,192,96,0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cmp-hero-section::after {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: -10%;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139,36,29,0.35) 0%, transparent 70%);
   pointer-events: none;
 }
 .cmp-hero-box {
   background: #ffffff;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 24px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+  box-shadow: 0 16px 40px rgba(98,19,10,0.2);
   margin-top: 28px;
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
   color: var(--n900);
 }
 .cmp-slots-grid {
@@ -233,29 +245,29 @@ $industries = $pdo->query(
   .cmp-slots-grid { grid-template-columns: 1fr; }
 }
 .cmp-slot-card {
-  border: 2px dashed #cbd5e1;
-  border-radius: 12px;
+  border: 2px dashed var(--n200);
+  border-radius: var(--r);
   padding: 20px 14px;
   text-align: center;
-  background: #f8fafc;
+  background: var(--n50);
   min-height: 200px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: all 0.25s ease;
+  transition: var(--t);
   position: relative;
 }
 .cmp-slot-card:hover {
-  border-color: #f97316;
-  background: #fff7ed;
+  border-color: var(--brand);
+  background: var(--brand-3);
   transform: translateY(-2px);
 }
 .cmp-slot-card.filled {
   border-style: solid;
-  border-color: #e2e8f0;
+  border-color: var(--n200);
   background: #ffffff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: var(--shadow-sm);
   padding: 14px;
   justify-content: flex-start;
 }
@@ -264,22 +276,22 @@ $industries = $pdo->query(
   background: #fff;
 }
 .cmp-slot-plus-icon {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: #ffedd5;
-  color: #ea580c;
+  background: var(--brand-3);
+  color: var(--brand);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
   font-weight: 700;
   margin-bottom: 10px;
-  transition: transform 0.2s;
+  transition: transform 0.2s, background 0.2s, color 0.2s;
 }
 .cmp-slot-card:hover .cmp-slot-plus-icon {
-  transform: scale(1.1);
-  background: #ea580c;
+  transform: scale(1.08);
+  background: var(--brand);
   color: #fff;
 }
 .cmp-card-remove-btn {
@@ -289,45 +301,46 @@ $industries = $pdo->query(
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: rgba(239,68,68,0.1);
-  color: #dc2626;
-  border: none;
+  background: var(--red-lt);
+  color: var(--red);
+  border: 1px solid rgba(220,38,38,0.2);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   font-weight: 700;
-  transition: all 0.2s;
+  transition: var(--t);
 }
 .cmp-card-remove-btn:hover {
-  background: #dc2626;
+  background: var(--red);
   color: #fff;
 }
 .cmp-btn-compare-now {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
   color: #ffffff;
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 700;
-  padding: 14px 44px;
+  padding: 13px 40px;
   border-radius: 100px;
   border: none;
-  box-shadow: 0 8px 24px rgba(234,88,12,0.35);
+  box-shadow: 0 8px 24px rgba(139,36,29,0.32);
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: var(--t);
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  font-family: 'DM Sans', sans-serif;
 }
 .cmp-btn-compare-now:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(234,88,12,0.45);
-  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+  box-shadow: 0 12px 28px rgba(139,36,29,0.45);
+  background: linear-gradient(135deg, var(--brand-2) 0%, #62130a 100%);
   color: #fff;
 }
 .cmp-btn-compare-now:disabled {
-  background: #cbd5e1;
-  color: #64748b;
+  background: var(--n200);
+  color: var(--n500);
   box-shadow: none;
   cursor: not-allowed;
   transform: none;
@@ -345,31 +358,31 @@ $industries = $pdo->query(
 }
 .popular-cmp-card {
   background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
+  border-radius: var(--r);
+  border: 1px solid var(--n200);
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+  transition: var(--t);
   display: flex;
   flex-direction: column;
   position: relative;
 }
 .popular-cmp-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 32px rgba(0,0,0,0.1);
-  border-color: #f97316;
+  box-shadow: var(--shadow);
+  border-color: var(--brand);
 }
 .popular-cmp-card.sponsored {
-  border-color: #fde68a;
-  background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%);
+  border-color: var(--n200);
+  background: linear-gradient(180deg, var(--accent-lt) 0%, #ffffff 100%);
 }
 .popular-cmp-head {
   padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #f1f5f9;
-  background: #fafafa;
+  border-bottom: 1px solid var(--n100);
+  background: var(--n50);
 }
 .popular-cmp-body {
   padding: 18px;
@@ -391,31 +404,31 @@ $industries = $pdo->query(
   width: 90px;
   height: 80px;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--n200);
   margin-bottom: 8px;
-  background: #f8fafc;
+  background: var(--n50);
 }
 .popular-vs-badge {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #0f172a;
+  background: var(--brand);
   color: #fff;
   font-weight: 800;
   font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  box-shadow: 0 4px 12px rgba(139,36,29,0.3);
   border: 3px solid #ffffff;
   z-index: 2;
   flex-shrink: 0;
 }
 .popular-cmp-footer {
   padding: 14px 18px;
-  background: #f8fafc;
-  border-top: 1px solid #f1f5f9;
+  background: var(--n50);
+  border-top: 1px solid var(--n100);
 }
 
 /* ── Section Title Aesthetic ── */
@@ -442,40 +455,42 @@ $industries = $pdo->query(
 .showcase-tab-btn {
   padding: 8px 18px;
   border-radius: 100px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--n200);
   background: #ffffff;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--n700);
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: var(--t);
+  font-family: 'DM Sans', sans-serif;
 }
 .showcase-tab-btn:hover {
-  border-color: #f97316;
-  color: #ea580c;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 .showcase-tab-btn.active {
-  background: #0f172a;
+  background: var(--brand);
   color: #ffffff;
-  border-color: #0f172a;
+  border-color: var(--brand);
 }
 .quick-cmp-chip {
   display: inline-block;
   font-size: 11px;
   font-weight: 600;
-  color: #ea580c;
-  background: #fff7ed;
-  border: 1px solid #ffedd5;
-  border-radius: 6px;
-  padding: 3px 8px;
+  color: var(--brand);
+  background: var(--brand-3);
+  border: 1px solid var(--n200);
+  border-radius: var(--r-sm);
+  padding: 4px 9px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: var(--t);
+  font-family: 'DM Sans', sans-serif;
 }
 .quick-cmp-chip:hover {
-  background: #ea580c;
+  background: var(--brand);
   color: #fff;
-  border-color: #ea580c;
+  border-color: var(--brand);
 }
 </style>
 
@@ -525,7 +540,7 @@ $industries = $pdo->query(
               <div style="font-size:11.5px;color:var(--n500);margin-bottom:6px">
                 🏭 <?= sH($slotProd['company'] ?: $slotProd['vname']) ?>
               </div>
-              <div style="font-size:12px;font-weight:700;color:#ea580c;margin-top:auto">
+              <div style="font-size:12px;font-weight:700;color:var(--brand);margin-top:auto">
                 <?= $slotProd['price_range'] ? '₹ '.sH($slotProd['price_range']) : 'Contact for Price' ?>
               </div>
             </div>
@@ -539,7 +554,7 @@ $industries = $pdo->query(
               <div style="font-size:12px;color:var(--n500);line-height:1.4">
                 Select from verified mills & categories
               </div>
-              <div style="margin-top:10px;font-size:11.5px;font-weight:600;color:#ea580c;background:#fff7ed;padding:4px 10px;border-radius:100px">
+              <div style="margin-top:10px;font-size:11.5px;font-weight:600;color:var(--brand);background:var(--brand-3);padding:4px 10px;border-radius:100px">
                 + Select Product
               </div>
             </div>
@@ -551,7 +566,7 @@ $industries = $pdo->query(
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:22px;padding-top:18px;border-top:1px solid #f1f5f9">
         <div style="font-size:13.5px;color:var(--n600)">
           <?php if(count($products) >= 2): ?>
-            <span style="color:#16a34a;font-weight:700">✓ Ready to compare:</span> You have selected <strong><?= count($products) ?></strong> of 4 paper & packaging grades.
+            <span style="color:var(--green,#16a34a);font-weight:700">✓ Ready to compare:</span> You have selected <strong><?= count($products) ?></strong> of 4 paper & packaging grades.
           <?php elseif(count($products) === 1): ?>
             <span>ℹ️ Please select <strong>1 more grade</strong> to analyze side-by-side specs.</span>
           <?php else: ?>
@@ -608,7 +623,7 @@ $industries = $pdo->query(
       </div>
       
       <div class="cmp-controls-bar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <label class="diff-toggle-wrap" title="Highlight parameters with differing values across compared products" style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #cbd5e1;padding:6px 12px;border-radius:6px;cursor:pointer">
+        <label class="diff-toggle-wrap" title="Highlight parameters with differing values across compared products" style="display:inline-flex;align-items:center;gap:6px;background:var(--n50);border:1px solid var(--n200);padding:6px 12px;border-radius:6px;cursor:pointer">
           <input type="checkbox" id="diff-toggle" onchange="toggleDiffHighlights(this.checked)">
           <span style="font-weight:600;font-size:13px;color:var(--n700)">⚡ Highlight Differences</span>
         </label>
@@ -788,22 +803,22 @@ $industries = $pdo->query(
     </div>
 
     <!-- Multi-Vendor RFQ Section -->
-    <div class="cmp-multi-rfq" style="margin-top:36px;background:linear-gradient(135deg,#0a192f 0%,#1e3a5f 100%);border-radius:var(--r-md);padding:32px;color:#fff;box-shadow:var(--shadow-md)">
+    <div class="cmp-multi-rfq" style="margin-top:36px;background:linear-gradient(135deg,#62130a 0%,var(--brand) 60%,#A8302A 100%);border-radius:var(--r-md);padding:32px;color:#fff;box-shadow:0 12px 36px rgba(98,19,10,0.28)">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px">
         <div style="max-width:680px">
-          <span style="background:rgba(230,126,34,0.25);color:#f39c12;border:1px solid rgba(243,156,18,0.4);font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:0.04em">⚡ Consolidated Multi-Mill RFQ</span>
+          <span style="background:rgba(240,192,96,0.25);color:#F0C060;border:1px solid rgba(240,192,96,0.45);font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:0.04em">⚡ Consolidated Multi-Mill RFQ</span>
           <h3 style="font-size:22px;font-weight:800;margin-top:10px;color:#fff">Send 1 Unified RFQ to All Compared Manufacturers</h3>
-          <p style="color:rgba(255,255,255,0.75);font-size:14px;margin-top:6px;line-height:1.5">Receive competitive rate quotes and technical delivery schedules simultaneously without re-entering your specifications for each mill.</p>
+          <p style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:6px;line-height:1.5">Receive competitive rate quotes and technical delivery schedules simultaneously without re-entering your specifications for each mill.</p>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
             <?php foreach($products as $p): ?>
-            <span style="background:rgba(255,255,255,0.12);padding:4px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
+            <span style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
               🏭 <?= sH($p['company'] ?: $p['vname']) ?> (<?= sH($p['name']) ?>)
             </span>
             <?php endforeach; ?>
           </div>
         </div>
         <div>
-          <button type="button" class="btn btn-accent btn-lg" onclick="openMultiVendorModal()" style="padding:14px 28px;font-size:15px;font-weight:700;box-shadow:0 6px 20px rgba(230,126,34,0.4)">
+          <button type="button" class="btn btn-accent btn-lg" onclick="openMultiVendorModal()" style="padding:14px 28px;font-size:15px;font-weight:700;box-shadow:0 6px 20px rgba(240,192,96,0.35)">
             🚀 Send Multi-Mill Enquiry →
           </button>
         </div>
@@ -823,7 +838,7 @@ $industries = $pdo->query(
     <div id="cmp-overview-more" style="display:none;margin-top:12px;font-size:13.5px;color:var(--n600);line-height:1.6;border-top:1px dashed var(--n200);padding-top:12px">
       Whether you are designing heavy-duty 5-ply export master cartons requiring high RCT (Ring Crush Test) values or food-grade shopping bags requiring high tensile strength and low Cobb 60 sizing, our comparison tool lets you cross-examine full mill Technical Data Sheets (TDS) and dispatch unified RFQs directly to verified manufacturers.
     </div>
-    <button type="button" onclick="toggleOverviewMore(this)" style="background:none;border:none;color:#ea580c;font-size:13px;font-weight:700;cursor:pointer;padding:6px 0 0;display:inline-block">
+    <button type="button" onclick="toggleOverviewMore(this)" style="background:none;border:none;color:var(--brand);font-size:13px;font-weight:700;cursor:pointer;padding:6px 0 0;display:inline-block">
       Read More ▼
     </button>
   </div>
@@ -832,7 +847,7 @@ $industries = $pdo->query(
   <div style="margin-bottom:60px">
     <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px">
       <div>
-        <div class="section-label" style="color:#ea580c">Curated Matchups</div>
+        <div class="section-label">Curated Matchups</div>
         <h2 class="section-title-modern">Popular Paper & Board Comparisons</h2>
         <p class="section-subtitle-modern">Predefined side-by-side matchups frequently evaluated by converters and packaging procurement teams.</p>
       </div>
@@ -853,11 +868,11 @@ $industries = $pdo->query(
             <div class="popular-cmp-head">
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                 <?php if($pc['is_sponsored']): ?>
-                  <span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700">
+                  <span style="background:var(--amber-lt,#fef3c7);color:#92400e;border:1px solid #fde68a;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700">
                     ⭐ Sponsored<?= $pc['sponsor_name'] ? ' by '.sH($pc['sponsor_name']) : '' ?>
                   </span>
                 <?php else: ?>
-                  <span style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700">
+                  <span style="background:var(--brand-3);color:var(--brand);border:1px solid var(--n200);padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700">
                     🏷️ <?= sH($pc['badge_text'] ?: 'Popular') ?>
                   </span>
                 <?php endif; ?>
@@ -888,7 +903,7 @@ $industries = $pdo->query(
                 <div style="font-weight:700;font-size:12.5px;color:var(--n900);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px" title="<?= sH($prodA['name'] ?? '') ?>">
                   <?= sH($prodA['name'] ?? 'Substrate A') ?>
                 </div>
-                <div style="font-size:11.5px;font-weight:700;color:#ea580c;margin-top:4px">
+                <div style="font-size:11.5px;font-weight:700;color:var(--brand);margin-top:4px">
                   <?= ($prodA && $prodA['price_range']) ? '₹ '.sH($prodA['price_range']) : 'Contact Rate' ?>
                 </div>
               </div>
@@ -914,7 +929,7 @@ $industries = $pdo->query(
                 <div style="font-weight:700;font-size:12.5px;color:var(--n900);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px" title="<?= sH($prodB['name'] ?? '') ?>">
                   <?= sH($prodB['name'] ?? 'Substrate B') ?>
                 </div>
-                <div style="font-size:11.5px;font-weight:700;color:#ea580c;margin-top:4px">
+                <div style="font-size:11.5px;font-weight:700;color:var(--brand);margin-top:4px">
                   <?= ($prodB && $prodB['price_range']) ? '₹ '.sH($prodB['price_range']) : 'Contact Rate' ?>
                 </div>
               </div>
@@ -961,7 +976,7 @@ $industries = $pdo->query(
     <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:20px">
       <!-- Guide 1 -->
       <div style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
-        <div style="height:140px;background:linear-gradient(135deg,#94a3b8 0%,#64748b 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
+        <div style="height:140px;background:linear-gradient(135deg,#62130a 0%,#8B241D 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
           📦
         </div>
         <div style="padding:16px;flex:1;display:flex;flex-direction:column">
@@ -980,7 +995,7 @@ $industries = $pdo->query(
 
       <!-- Guide 2 -->
       <div style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
-        <div style="height:140px;background:linear-gradient(135deg,#64748b 0%,#475569 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
+        <div style="height:140px;background:linear-gradient(135deg,#8B241D 0%,#A8302A 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
           📑
         </div>
         <div style="padding:16px;flex:1;display:flex;flex-direction:column">
@@ -999,7 +1014,7 @@ $industries = $pdo->query(
 
       <!-- Guide 3 -->
       <div style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
-        <div style="height:140px;background:linear-gradient(135deg,#475569 0%,#334155 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
+        <div style="height:140px;background:linear-gradient(135deg,#A8302A 0%,#b45309 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
           🏗️
         </div>
         <div style="padding:16px;flex:1;display:flex;flex-direction:column">
@@ -1018,7 +1033,7 @@ $industries = $pdo->query(
 
       <!-- Guide 4 -->
       <div style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
-        <div style="height:140px;background:linear-gradient(135deg,#334155 0%,#1e293b 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
+        <div style="height:140px;background:linear-gradient(135deg,#78350f 0%,#d97706 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
           🧪
         </div>
         <div style="padding:16px;flex:1;display:flex;flex-direction:column">
@@ -1068,7 +1083,7 @@ $industries = $pdo->query(
             <?php else: ?>
               <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px">📦</div>
             <?php endif; ?>
-            <span class="badge" style="position:absolute;top:10px;left:10px;background:rgba(15,23,42,0.85);color:#fff;font-size:11px">
+            <span class="badge" style="position:absolute;top:10px;left:10px;background:rgba(98,19,10,0.88);color:#fff;font-size:11px">
               <?= sH($tp['cname']) ?>
             </span>
           </div>
@@ -1081,7 +1096,7 @@ $industries = $pdo->query(
               🏭 <?= sH($tp['company'] ?: $tp['vname']) ?>
             </div>
             
-            <div style="font-size:13.5px;font-weight:700;color:#ea580c;margin-bottom:12px">
+            <div style="font-size:13.5px;font-weight:700;color:var(--brand);margin-bottom:12px">
               <?= $tp['price_range'] ? '₹ '.sH($tp['price_range']) : 'Contact for Rate' ?>
             </div>
 
@@ -1090,7 +1105,7 @@ $industries = $pdo->query(
               <div style="font-size:11px;font-weight:600;color:var(--n400);margin-bottom:6px">Quick Compare:</div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
                 <button type="button" class="quick-cmp-chip" onclick="quickAddToCompare(<?= $tp['id'] ?>)">+ Compare Grade</button>
-                <a href="<?= BASE_URL ?>/public/product.php?id=<?= $tp['id'] ?>" class="quick-cmp-chip" style="color:var(--n700);background:#f1f5f9;border-color:#e2e8f0">View Details</a>
+                <a href="<?= BASE_URL ?>/public/product.php?id=<?= $tp['id'] ?>" class="quick-cmp-chip" style="color:var(--n700);background:var(--n50);border-color:var(--n200)">View Details</a>
               </div>
             </div>
           </div>
