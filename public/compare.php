@@ -1,5 +1,6 @@
 <?php
-$pageTitle   = 'Compare Products & Technical Specifications — PaperMart';
+$pageTitle   = 'Compare Paper & Board Grades — Side-by-Side TDS Specifications — paperKart';
+$pageDesc    = 'Compare paper & packaging grades side-by-side with full Technical Data Sheets (TDS), Burst Factor, GSM, Cobb 60, and mill commercial terms.';
 $currentPage = 'compare';
 include __DIR__.'/includes/header.php';
 
@@ -7,7 +8,7 @@ include __DIR__.'/includes/header.php';
 $sessionKey = session_id();
 try {
     $stmt=$pdo->prepare("SELECT p.*,u.company,u.name AS vname,u.city AS vcity,u.state AS vstate,vp.is_verified,c.name AS cname,pt.name AS tname,i.name AS iname FROM compare_sessions cs JOIN products p ON p.id=cs.product_id JOIN users u ON u.id=p.vendor_id LEFT JOIN vendor_profiles vp ON vp.vendor_id=p.vendor_id LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN product_types pt ON pt.id=p.product_type_id LEFT JOIN industries i ON i.id=p.industry_id WHERE cs.session_key=? AND p.status='active' ORDER BY cs.added_at ASC");
-    $stmt->execute([$sessionKey]); $products=$stmt->fetchAll();
+    $stmt->execute([$sessionKey]); $products=$stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch(Exception $e) { $products=[]; }
 
 // Collect attributes & TDS files
@@ -24,7 +25,7 @@ foreach($products as $p){
     if ($p['industry_id']) $industryIds[] = (int)$p['industry_id'];
 
     $as=$pdo->prepare("SELECT * FROM product_attributes WHERE product_id=? ORDER BY sort_order");
-    $as->execute([$p['id']]); $list=$as->fetchAll();
+    $as->execute([$p['id']]); $list=$as->fetchAll(PDO::FETCH_ASSOC);
     $productAttrs[$p['id']]=[];
     $productTds[$p['id']]=[];
     foreach($list as $a){
@@ -75,7 +76,78 @@ foreach ($allAttrNames as $attr) {
     }
 }
 
-// Recommended alternative products
+// ── POPULAR COMPARISONS (Admin-Curated & Sponsored) ──
+$popularComparisons = [];
+$popProductMap = [];
+try {
+    $popStmt = $pdo->query("
+        SELECT pc.*, c.name AS category_name 
+        FROM popular_comparisons pc 
+        LEFT JOIN categories c ON c.id = pc.category_id 
+        WHERE pc.status = 'active' 
+        ORDER BY pc.sort_order ASC, pc.id DESC 
+        LIMIT 8
+    ");
+    $popularComparisons = $popStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $allPopPids = [];
+    foreach ($popularComparisons as $pc) {
+        $pids = array_filter(array_map('intval', explode(',', $pc['product_ids'])));
+        foreach ($pids as $pid) $allPopPids[$pid] = true;
+    }
+    if (!empty($allPopPids)) {
+        $inPids = implode(',', array_keys($allPopPids));
+        $pStmt = $pdo->query("
+            SELECT p.id, p.name, p.images, p.price_range, p.min_order_qty, c.name AS cname, pt.name AS tname, u.company, u.name AS vname, vp.is_verified
+            FROM products p
+            JOIN users u ON u.id = p.vendor_id
+            LEFT JOIN vendor_profiles vp ON vp.vendor_id = p.vendor_id
+            LEFT JOIN categories c ON c.id = p.category_id
+            LEFT JOIN product_types pt ON pt.id = p.product_type_id
+            WHERE p.id IN ($inPids)
+        ");
+        while ($pRow = $pStmt->fetch(PDO::FETCH_ASSOC)) {
+            $popProductMap[$pRow['id']] = $pRow;
+        }
+    }
+} catch(Exception $e) {
+    $popularComparisons = [];
+}
+
+// ── POPULAR PRODUCTS BY CATEGORY TABS ──
+$tabCategories = [];
+$tabProducts = [];
+try {
+    $tabCatStmt = $pdo->query("
+        SELECT c.id, c.name, COUNT(p.id) as product_count
+        FROM categories c
+        JOIN products p ON p.category_id = c.id AND p.status = 'active'
+        WHERE c.status = 1
+        GROUP BY c.id, c.name
+        HAVING product_count > 0
+        ORDER BY product_count DESC, c.name ASC
+        LIMIT 6
+    ");
+    $tabCategories = $tabCatStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $tabProdStmt = $pdo->query("
+        SELECT p.id, p.name, p.images, p.price_range, p.min_order_qty, p.category_id, c.name AS cname, pt.name AS tname, u.company, u.name AS vname, vp.is_verified
+        FROM products p
+        JOIN users u ON u.id = p.vendor_id
+        LEFT JOIN vendor_profiles vp ON vp.vendor_id = p.vendor_id
+        LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN product_types pt ON pt.id = p.product_type_id
+        WHERE p.status = 'active'
+        ORDER BY p.views DESC, p.id DESC
+        LIMIT 16
+    ");
+    $tabProducts = $tabProdStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch(Exception $e) {
+    $tabCategories = [];
+    $tabProducts = [];
+}
+
+// ── RECOMMENDED ALTERNATIVE PRODUCTS ──
 $recommendedProducts = [];
 try {
     if (!empty($comparedIds)) {
@@ -90,10 +162,10 @@ try {
                 JOIN categories c ON c.id=p.category_id 
                 LEFT JOIN product_types pt ON pt.id=p.product_type_id 
                 WHERE p.status='active' AND p.id NOT IN ($inClause) AND p.category_id IN ($catInClause) 
-                ORDER BY p.views_count DESC, p.id DESC LIMIT 4";
+                ORDER BY p.views DESC, p.id DESC LIMIT 4";
         $recStmt = $pdo->prepare($sql);
         $recStmt->execute(array_merge($comparedIds, array_values($catParams)));
-        $recommendedProducts = $recStmt->fetchAll();
+        $recommendedProducts = $recStmt->fetchAll(PDO::FETCH_ASSOC);
     }
     if (empty($recommendedProducts)) {
         $recStmt = $pdo->prepare("SELECT p.*, u.company, u.name AS vname, vp.is_verified, c.name AS cname, pt.name AS tname 
@@ -103,9 +175,9 @@ try {
                                   JOIN categories c ON c.id=p.category_id 
                                   LEFT JOIN product_types pt ON pt.id=p.product_type_id 
                                   WHERE p.status='active' " . (!empty($comparedIds) ? "AND p.id NOT IN (" . implode(',', $comparedIds) . ")" : "") . " 
-                                  ORDER BY p.views_count DESC, p.id DESC LIMIT 4");
+                                  ORDER BY p.views DESC, p.id DESC LIMIT 4");
         $recStmt->execute();
-        $recommendedProducts = $recStmt->fetchAll();
+        $recommendedProducts = $recStmt->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch(Exception $e) {
     $recommendedProducts = [];
@@ -118,37 +190,425 @@ $industries = $pdo->query(
      JOIN products p ON p.industry_id = i.id AND p.status = 'active'
      WHERE i.status = 1
      ORDER BY i.sort_order, i.name"
-)->fetchAll();
+)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<!-- Breadcrumb -->
-<div style="background:var(--n50);padding:14px 0;border-bottom:1px solid var(--n200)">
-  <div class="container" style="font-size:13px;color:var(--n500);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-    <div>
-      <a href="<?= BASE_URL ?>/public/index.php" style="color:var(--brand-2)">Home</a> › 
-      <a href="<?= BASE_URL ?>/public/products.php" style="color:var(--brand-2)">Marketplace</a> › 
-      <span>Compare Products</span>
+<style>
+/* ── Modern Compare Styles ── */
+.cmp-hero-section {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  position: relative;
+  overflow: hidden;
+  padding: 48px 0 56px;
+  color: #fff;
+}
+.cmp-hero-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(230,81,0,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cmp-hero-box {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+  margin-top: 28px;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: var(--n900);
+}
+.cmp-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 992px) {
+  .cmp-slots-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 540px) {
+  .cmp-slots-grid { grid-template-columns: 1fr; }
+}
+.cmp-slot-card {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 20px 14px;
+  text-align: center;
+  background: #f8fafc;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  position: relative;
+}
+.cmp-slot-card:hover {
+  border-color: #f97316;
+  background: #fff7ed;
+  transform: translateY(-2px);
+}
+.cmp-slot-card.filled {
+  border-style: solid;
+  border-color: #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  padding: 14px;
+  justify-content: flex-start;
+}
+.cmp-slot-card.filled:hover {
+  border-color: var(--brand);
+  background: #fff;
+}
+.cmp-slot-plus-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffedd5;
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  transition: transform 0.2s;
+}
+.cmp-slot-card:hover .cmp-slot-plus-icon {
+  transform: scale(1.1);
+  background: #ea580c;
+  color: #fff;
+}
+.cmp-card-remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(239,68,68,0.1);
+  color: #dc2626;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+.cmp-card-remove-btn:hover {
+  background: #dc2626;
+  color: #fff;
+}
+.cmp-btn-compare-now {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px 44px;
+  border-radius: 100px;
+  border: none;
+  box-shadow: 0 8px 24px rgba(234,88,12,0.35);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.cmp-btn-compare-now:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(234,88,12,0.45);
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+  color: #fff;
+}
+.cmp-btn-compare-now:disabled {
+  background: #cbd5e1;
+  color: #64748b;
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Popular Comparisons Grid ── */
+.popular-cmp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 24px;
+  margin-top: 22px;
+}
+@media (max-width: 768px) {
+  .popular-cmp-grid { grid-template-columns: 1fr; }
+}
+.popular-cmp-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.popular-cmp-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(0,0,0,0.1);
+  border-color: #f97316;
+}
+.popular-cmp-card.sponsored {
+  border-color: #fde68a;
+  background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%);
+}
+.popular-cmp-head {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fafafa;
+}
+.popular-cmp-body {
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  gap: 12px;
+  flex: 1;
+}
+.popular-product-col {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.popular-prod-img {
+  width: 90px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 8px;
+  background: #f8fafc;
+}
+.popular-vs-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  border: 3px solid #ffffff;
+  z-index: 2;
+  flex-shrink: 0;
+}
+.popular-cmp-footer {
+  padding: 14px 18px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* ── Section Title Aesthetic ── */
+.section-title-modern {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--n900);
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+.section-subtitle-modern {
+  font-size: 14.5px;
+  color: var(--n500);
+}
+
+/* ── Tabbed Showcase ── */
+.showcase-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 24px;
+}
+.showcase-tab-btn {
+  padding: 8px 18px;
+  border-radius: 100px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--n700);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.showcase-tab-btn:hover {
+  border-color: #f97316;
+  color: #ea580c;
+}
+.showcase-tab-btn.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+.quick-cmp-chip {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ea580c;
+  background: #fff7ed;
+  border: 1px solid #ffedd5;
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.quick-cmp-chip:hover {
+  background: #ea580c;
+  color: #fff;
+  border-color: #ea580c;
+}
+</style>
+
+<!-- ═══════════════════════════════════════════════════════
+     HERO SECTION (CardDekho-Inspired 4-Slot Comparator)
+     ═══════════════════════════════════════════════════════ -->
+<section class="cmp-hero-section">
+  <div class="container">
+    <div style="max-width:760px">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);backdrop-filter:blur(6px);padding:6px 14px;border-radius:100px;font-size:12.5px;font-weight:600;margin-bottom:14px;border:1px solid rgba(255,255,255,0.2)">
+        <span>⚖️ Technical Substrate Comparator</span>
+      </div>
+      <h1 style="font-size:clamp(28px, 4vw, 42px);font-weight:800;letter-spacing:-0.03em;line-height:1.2;margin-bottom:10px">
+        Confused? Easy way to compare paper & board grades
+      </h1>
+      <p style="font-size:15px;color:rgba(255,255,255,0.8);line-height:1.6;margin:0">
+        Analyze Burst Factor (BF), GSM basis weight, Cobb 60 moisture resistance, caliper, and mill commercial terms side-by-side to choose the optimal substrate.
+      </p>
     </div>
-    <?php if ($products): ?>
-    <div style="font-size:12px;color:var(--n600);font-weight:600">
-      Comparing <strong style="color:var(--brand)"><?= count($products) ?></strong> of 4 products
+
+    <!-- 4-Slot Comparison Builder Box -->
+    <div class="cmp-hero-box">
+      <div class="cmp-slots-grid">
+        <?php for($slotIdx=0; $slotIdx<4; $slotIdx++): 
+            $slotProd = $products[$slotIdx] ?? null;
+        ?>
+          <?php if($slotProd): 
+              $sImgs = array_filter(explode(',',$slotProd['images']??''));
+              $sImg = reset($sImgs)?UPLOAD_URL.trim(reset($sImgs)):'';
+          ?>
+            <!-- Filled Slot -->
+            <div class="cmp-slot-card filled">
+              <button type="button" class="cmp-card-remove-btn" onclick="removeFromComparePage(<?= $slotProd['id'] ?>)" title="Remove this grade">✕</button>
+              
+              <?php if($sImg): ?>
+                <img src="<?= sH($sImg) ?>" alt="<?= sH($slotProd['name']) ?>" style="width:70px;height:65px;object-fit:cover;border-radius:6px;margin-bottom:8px">
+              <?php else: ?>
+                <div style="width:70px;height:65px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:8px">📦</div>
+              <?php endif; ?>
+
+              <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;margin-bottom:2px">
+                <?= sH($slotProd['cname'] ?: 'Grade') ?>
+              </div>
+              <div style="font-weight:700;font-size:13.5px;color:var(--n900);line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
+                <?= sH($slotProd['name']) ?>
+              </div>
+              <div style="font-size:11.5px;color:var(--n500);margin-bottom:6px">
+                🏭 <?= sH($slotProd['company'] ?: $slotProd['vname']) ?>
+              </div>
+              <div style="font-size:12px;font-weight:700;color:#ea580c;margin-top:auto">
+                <?= $slotProd['price_range'] ? '₹ '.sH($slotProd['price_range']) : 'Contact for Price' ?>
+              </div>
+            </div>
+          <?php else: ?>
+            <!-- Empty Add Slot -->
+            <div class="cmp-slot-card" onclick="openAddProductPicker()" style="cursor:pointer">
+              <div class="cmp-slot-plus-icon">+</div>
+              <div style="font-weight:700;font-size:14px;color:var(--n800);margin-bottom:4px">
+                <?= $slotIdx === 0 ? 'Add 1st Grade' : ($slotIdx === 1 ? 'Add 2nd Grade' : 'Add Grade') ?>
+              </div>
+              <div style="font-size:12px;color:var(--n500);line-height:1.4">
+                Select from verified mills & categories
+              </div>
+              <div style="margin-top:10px;font-size:11.5px;font-weight:600;color:#ea580c;background:#fff7ed;padding:4px 10px;border-radius:100px">
+                + Select Product
+              </div>
+            </div>
+          <?php endif; ?>
+        <?php endfor; ?>
+      </div>
+
+      <!-- Action Bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:22px;padding-top:18px;border-top:1px solid #f1f5f9">
+        <div style="font-size:13.5px;color:var(--n600)">
+          <?php if(count($products) >= 2): ?>
+            <span style="color:#16a34a;font-weight:700">✓ Ready to compare:</span> You have selected <strong><?= count($products) ?></strong> of 4 paper & packaging grades.
+          <?php elseif(count($products) === 1): ?>
+            <span>ℹ️ Please select <strong>1 more grade</strong> to analyze side-by-side specs.</span>
+          <?php else: ?>
+            <span>Select <strong>2 to 4 grades</strong> above or pick a predefined popular matchup below.</span>
+          <?php endif; ?>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px">
+          <?php if(count($products) > 0): ?>
+            <button type="button" class="btn btn-outline btn-sm" onclick="clearComparePage()" style="color:#b91c1c;border-color:#fca5a5">
+              ✕ Clear All
+            </button>
+          <?php endif; ?>
+          
+          <button type="button" class="cmp-btn-compare-now" onclick="scrollToComparisonTable()" <?= count($products) < 2 ? 'disabled' : '' ?>>
+            Compare Now ⚡
+          </button>
+        </div>
+      </div>
     </div>
-    <?php endif; ?>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     PROMOTIONAL STRIP / TRUST BAR
+     ═══════════════════════════════════════════════════════ -->
+<div style="background:#fff;border-bottom:1px solid var(--n200);padding:14px 0">
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--n600)">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">🛡️</span>
+      <span><strong>Direct Mill Verification:</strong> All specifications backed by mill Technical Data Sheets (TDS).</span>
+    </div>
+    <div style="display:flex;gap:20px;align-items:center">
+      <span>🏭 100+ Verified Paper Mills</span>
+      <span>📦 Corrugated & Kraft Experts</span>
+      <span>📄 Standardized ISO Tests</span>
+    </div>
   </div>
 </div>
 
-<section class="compact" style="padding-top:28px;padding-bottom:50px">
-  <div class="container">
+<!-- ═══════════════════════════════════════════════════════
+     MAIN BODY & SECTIONS
+     ═══════════════════════════════════════════════════════ -->
+<div class="container" style="padding-top:40px;padding-bottom:60px">
+
+  <!-- ── 1. ACTIVE SIDE-BY-SIDE SPECIFICATION TABLE (IF PRODUCTS SELECTED) ── -->
+  <?php if (!empty($products)): ?>
+  <div id="active-comparison-table-section" style="margin-bottom:60px">
     <div class="section-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:20px">
       <div>
-        <div class="section-label">Technical Side-by-Side Analysis</div>
-        <h1 style="font-size:28px;color:var(--n900);font-weight:800;letter-spacing:-0.02em">Paper & Board Grade Comparison</h1>
-        <p style="color:var(--n500);margin-top:6px;font-size:14.5px">Evaluate key engineering parameters, burst factor, moisture resistance, and mill commercial terms to select the ideal substrate.</p>
+        <div class="section-label">Technical Specification Matrix</div>
+        <h2 class="section-title-modern">Side-by-Side Grade Analysis</h2>
+        <p class="section-subtitle-modern">Compare physical properties, burst factor, moisture absorption, and mill terms.</p>
       </div>
       
-      <?php if ($products): ?>
-      <div class="cmp-controls-bar">
-        <label class="diff-toggle-wrap" title="Highlight parameters with differing values across compared products">
+      <div class="cmp-controls-bar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label class="diff-toggle-wrap" title="Highlight parameters with differing values across compared products" style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #cbd5e1;padding:6px 12px;border-radius:6px;cursor:pointer">
           <input type="checkbox" id="diff-toggle" onchange="toggleDiffHighlights(this.checked)">
           <span style="font-weight:600;font-size:13px;color:var(--n700)">⚡ Highlight Differences</span>
         </label>
@@ -158,38 +618,18 @@ $industries = $pdo->query(
         <button type="button" class="btn btn-outline btn-sm" onclick="shareComparison()" title="Copy comparison link">
           🔗 Share
         </button>
-        <button type="button" class="btn btn-outline btn-sm" onclick="clearComparePage()" style="color:#b91c1c;border-color:#fca5a5" title="Clear all compared items">
-          ✕ Clear All
+        <button type="button" class="btn btn-primary btn-sm" onclick="openAddProductPicker()">
+          + Add More
         </button>
       </div>
-      <?php endif; ?>
     </div>
 
-    <?php if (!$products): ?>
-      <div class="empty-state" style="padding:60px 20px;text-align:center;background:#fff;border-radius:var(--r-md);box-shadow:var(--shadow-sm);border:1px dashed var(--n300)">
-        <div class="empty-icon" style="font-size:54px;margin-bottom:12px">⚖️</div>
-        <h3 style="font-size:20px;font-weight:700;color:var(--n800)">No Products in Comparison</h3>
-        <p style="color:var(--n500);max-width:440px;margin:0 auto 20px auto;font-size:14px">Browse paper & packaging grades or click "+ Add Product" to compare up to 4 grades side-by-side with full TDS specifications.</p>
-        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-          <button type="button" class="btn btn-primary" onclick="openAddProductPicker()">+ Add Product to Compare</button>
-          <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-outline">Explore Marketplace</a>
-        </div>
-      </div>
-    <?php elseif(count($products)<2): ?>
-      <div class="site-alert site-alert-info" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px">
-        <div>
-          <span>ℹ️</span> <strong>Tip:</strong> Add at least 2 products to analyze differences side-by-side. You have added <strong>1 product</strong>.
-        </div>
-        <button type="button" class="btn btn-sm btn-primary" onclick="openAddProductPicker()">+ Add 2nd Product</button>
-      </div>
-    <?php endif; ?>
-
-    <?php if (count($products)>=1): ?>
-    <div class="compare-table-container" style="overflow-x:auto;margin-top:10px;background:#fff;border-radius:var(--r-md);box-shadow:var(--shadow-sm);border:1px solid var(--n200)">
+    <!-- Comparison Table Container -->
+    <div class="compare-table-container" style="overflow-x:auto;background:#fff;border-radius:var(--r-md);box-shadow:var(--shadow-sm);border:1px solid var(--n200)">
       <table class="compare-table" id="main-compare-table" style="width:100%;border-collapse:collapse">
         <thead>
           <tr>
-            <th style="min-width:210px;width:220px;background:var(--n50);vertical-align:bottom;padding:18px 16px;border-bottom:2px solid var(--n200)">
+            <th style="min-width:220px;width:230px;background:var(--n50);vertical-align:bottom;padding:18px 16px;border-bottom:2px solid var(--n200)">
               <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--n500);font-weight:700">Specification</div>
               <div style="font-size:16px;font-weight:800;color:var(--brand);margin-top:2px">Product Details</div>
             </th>
@@ -213,7 +653,7 @@ $industries = $pdo->query(
               <div style="font-size:12px;color:var(--n500);margin-bottom:4px"><?= sH($p['cname']) ?><?= $p['tname'] ? ' › '.sH($p['tname']) : '' ?></div>
               <div style="font-size:12.5px;font-weight:600;color:var(--brand);margin-bottom:12px;display:flex;align-items:center;gap:4px">
                 🏭 <?= sH($p['company'] ?: $p['vname']) ?>
-                <?php if($p['is_verified']): ?><span title="Verified Verified Manufacturer" style="color:var(--success,#16a34a);font-weight:bold">✓</span><?php endif; ?>
+                <?php if($p['is_verified']): ?><span title="Verified Manufacturer" style="color:var(--success,#16a34a);font-weight:bold">✓</span><?php endif; ?>
               </div>
 
               <div style="display:flex;flex-direction:column;gap:6px">
@@ -248,13 +688,11 @@ $industries = $pdo->query(
           </tr>
 
           <?php
-            // Helper function to render a table row with difference checking
             function renderCompareRow($label, $values, $maxCount, $highlightBest = false, $unit = '') {
                 $cleanVals = array_map(function($v) { return trim(strip_tags((string)$v)); }, $values);
                 $uniqueVals = array_unique(array_filter($cleanVals, function($v) { return $v !== '' && $v !== '—'; }));
                 $hasDiff = count($uniqueVals) > 1;
 
-                // Detect numeric best if requested
                 $bestIdx = null;
                 if ($highlightBest && count($uniqueVals) > 1) {
                     $nums = [];
@@ -371,105 +809,348 @@ $industries = $pdo->query(
         </div>
       </div>
     </div>
-    <?php endif; ?>
+  </div>
+  <?php endif; ?>
 
-    <!-- Technical Parameter Glossary Section -->
-    <div style="margin-top:56px">
-      <div class="section-head">
-        <div class="section-label">Engineering Reference</div>
-        <h2 style="font-size:22px;font-weight:800;color:var(--n900)">Paper & Packaging Specification Guide</h2>
-        <p style="color:var(--n500);margin-top:4px;font-size:14px">Understand what technical test parameters mean for your packaging and convertibility requirements.</p>
+  <!-- ── 2. COMPARE OVERVIEW CARD ── -->
+  <div style="background:#fff;border:1px solid var(--n200);border-radius:12px;padding:24px 28px;margin-bottom:44px;box-shadow:0 2px 10px rgba(0,0,0,0.03)">
+    <h3 style="font-size:19px;font-weight:700;color:var(--n900);margin-bottom:8px">
+      Compare Paper & Packaging Substrates
+    </h3>
+    <p style="font-size:14px;color:var(--n600);line-height:1.6;margin:0" id="cmp-overview-text">
+      Confused which kraft paper, duplex board, or packaging grade is right for your corrugation boxes or folding cartons? paperKart helps you compare two or more paper grades on key engineering parameters like <strong>Burst Factor (BF), GSM, Moisture Content, Cobb 60 water absorption, and Caliper thickness</strong>. Select substrates above or browse our curated popular comparisons.
+    </p>
+    <div id="cmp-overview-more" style="display:none;margin-top:12px;font-size:13.5px;color:var(--n600);line-height:1.6;border-top:1px dashed var(--n200);padding-top:12px">
+      Whether you are designing heavy-duty 5-ply export master cartons requiring high RCT (Ring Crush Test) values or food-grade shopping bags requiring high tensile strength and low Cobb 60 sizing, our comparison tool lets you cross-examine full mill Technical Data Sheets (TDS) and dispatch unified RFQs directly to verified manufacturers.
+    </div>
+    <button type="button" onclick="toggleOverviewMore(this)" style="background:none;border:none;color:#ea580c;font-size:13px;font-weight:700;cursor:pointer;padding:6px 0 0;display:inline-block">
+      Read More ▼
+    </button>
+  </div>
+
+  <!-- ── 3. POPULAR COMPARISONS SECTION (Dynamic & Admin Managed) ── -->
+  <div style="margin-bottom:60px">
+    <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px">
+      <div>
+        <div class="section-label" style="color:#ea580c">Curated Matchups</div>
+        <h2 class="section-title-modern">Popular Paper & Board Comparisons</h2>
+        <p class="section-subtitle-modern">Predefined side-by-side matchups frequently evaluated by converters and packaging procurement teams.</p>
       </div>
-
-      <div class="glossary-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:20px">
-        <div style="background:#fff;padding:20px;border-radius:var(--r-md);border:1px solid var(--n200);box-shadow:var(--shadow-sm)">
-          <div style="font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="background:var(--n100);width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px">⚖️</span>
-            Burst Factor (BF) & Index
-          </div>
-          <p style="font-size:13px;color:var(--n600);line-height:1.55;margin:0">Measures the substrate's hydrostatic pressure resistance before rupture. Essential for corrugation box stacking strength and puncture protection during transit.</p>
-        </div>
-
-        <div style="background:#fff;padding:20px;border-radius:var(--r-md);border:1px solid var(--n200);box-shadow:var(--shadow-sm)">
-          <div style="font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="background:var(--n100);width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px">💧</span>
-            Cobb 60 Value (g/m²)
-          </div>
-          <p style="font-size:13px;color:var(--n600);line-height:1.55;margin:0">Quantifies the amount of water absorbed by 1 m² of paper surface in 60 seconds. Lower Cobb values indicate superior water repellency and sizing quality.</p>
-        </div>
-
-        <div style="background:#fff;padding:20px;border-radius:var(--r-md);border:1px solid var(--n200);box-shadow:var(--shadow-sm)">
-          <div style="font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="background:var(--n100);width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px">📏</span>
-            GSM & Caliper (Microns)
-          </div>
-          <p style="font-size:13px;color:var(--n600);line-height:1.55;margin:0">GSM indicates basis weight in grams per square meter. Caliper measures single-sheet thickness in microns. High bulk provides rigidity at lower grammages.</p>
-        </div>
-
-        <div style="background:#fff;padding:20px;border-radius:var(--r-md);border:1px solid var(--n200);box-shadow:var(--shadow-sm)">
-          <div style="font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="background:var(--n100);width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px">✨</span>
-            Brightness & Opacity (%)
-          </div>
-          <p style="font-size:13px;color:var(--n600);line-height:1.55;margin:0">Reflectance of blue light (ISO 2470) determines print contrast and vibrancy. High opacity prevents show-through in duplex and multi-color offset printing.</p>
-        </div>
-      </div>
+      <?php if(!empty($popularComparisons)): ?>
+        <span style="font-size:13px;color:var(--n500);font-weight:600">Showing <?= count($popularComparisons) ?> Top Comparisons</span>
+      <?php endif; ?>
     </div>
 
-    <!-- Recommended Alternative Grades -->
-    <?php if (!empty($recommendedProducts)): ?>
-    <div style="margin-top:56px">
-      <div class="section-head" style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px">
-        <div>
-          <div class="section-label">Suggested Grades</div>
-          <h2 style="font-size:22px;font-weight:800;color:var(--n900)">Recommended Alternative Products</h2>
-          <p style="color:var(--n500);margin-top:4px;font-size:14px">Top rated paper & packaging grades from certified mills in matching categories.</p>
-        </div>
-        <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-outline btn-sm">Explore All Products →</a>
-      </div>
+    <?php if(!empty($popularComparisons)): ?>
+      <div class="popular-cmp-grid">
+        <?php foreach($popularComparisons as $pc): 
+            $pids = array_filter(array_map('intval', explode(',', $pc['product_ids'])));
+            $prodA = $popProductMap[$pids[0] ?? 0] ?? null;
+            $prodB = $popProductMap[$pids[1] ?? 0] ?? null;
+        ?>
+          <div class="popular-cmp-card <?= $pc['is_sponsored'] ? 'sponsored' : '' ?>">
+            <!-- Card Head -->
+            <div class="popular-cmp-head">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <?php if($pc['is_sponsored']): ?>
+                  <span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700">
+                    ⭐ Sponsored<?= $pc['sponsor_name'] ? ' by '.sH($pc['sponsor_name']) : '' ?>
+                  </span>
+                <?php else: ?>
+                  <span style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700">
+                    🏷️ <?= sH($pc['badge_text'] ?: 'Popular') ?>
+                  </span>
+                <?php endif; ?>
 
-      <div class="product-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px;margin-top:20px">
-        <?php foreach($recommendedProducts as $rp): ?>
-          <?php
-            $rimgs=array_filter(explode(',',$rp['images']??''));
-            $rimg=reset($rimgs)?UPLOAD_URL.trim(reset($rimgs)):'';
-          ?>
-          <div class="product-card" style="background:#fff;border-radius:var(--r-md);border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
-            <div style="position:relative;height:160px;background:var(--n50);overflow:hidden">
-              <?php if($rimg): ?>
-                <img src="<?= sH($rimg) ?>" alt="<?= sH($rp['name']) ?>" style="width:100%;height:100%;object-fit:cover">
-              <?php else: ?>
-                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px">📦</div>
-              <?php endif; ?>
-              <span class="badge" style="position:absolute;top:10px;left:10px;background:rgba(10,25,47,0.85);color:#fff;font-size:11px"><?= sH($rp['cname']) ?></span>
+                <?php if($pc['category_name']): ?>
+                  <span style="font-size:11px;color:var(--n500);font-weight:600">• <?= sH($pc['category_name']) ?></span>
+                <?php endif; ?>
+              </div>
             </div>
-            <div style="padding:16px;flex:1;display:flex;flex-direction:column">
-              <h4 style="font-size:14.5px;font-weight:700;color:var(--n900);line-height:1.35;margin-bottom:6px">
-                <a href="<?= BASE_URL ?>/public/product.php?id=<?= $rp['id'] ?>" style="color:inherit"><?= sH($rp['name']) ?></a>
+
+            <!-- Card Dual Products Showcase -->
+            <div class="popular-cmp-body">
+              <!-- Left Product -->
+              <div class="popular-product-col">
+                <?php 
+                  $imgsA = $prodA ? array_filter(explode(',', $prodA['images']??'')) : [];
+                  $imgA = reset($imgsA) ? UPLOAD_URL.trim(reset($imgsA)) : '';
+                ?>
+                <?php if($imgA): ?>
+                  <img src="<?= sH($imgA) ?>" class="popular-prod-img" alt="<?= sH($prodA['name'] ?? 'Product') ?>">
+                <?php else: ?>
+                  <div class="popular-prod-img" style="display:flex;align-items:center;justify-content:center;font-size:24px">📦</div>
+                <?php endif; ?>
+
+                <div style="font-size:10.5px;font-weight:700;color:var(--brand);text-transform:uppercase;margin-bottom:2px">
+                  <?= sH($prodA['cname'] ?? 'Grade A') ?>
+                </div>
+                <div style="font-weight:700;font-size:12.5px;color:var(--n900);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px" title="<?= sH($prodA['name'] ?? '') ?>">
+                  <?= sH($prodA['name'] ?? 'Substrate A') ?>
+                </div>
+                <div style="font-size:11.5px;font-weight:700;color:#ea580c;margin-top:4px">
+                  <?= ($prodA && $prodA['price_range']) ? '₹ '.sH($prodA['price_range']) : 'Contact Rate' ?>
+                </div>
+              </div>
+
+              <!-- VS Badge -->
+              <div class="popular-vs-badge">VS</div>
+
+              <!-- Right Product -->
+              <div class="popular-product-col">
+                <?php 
+                  $imgsB = $prodB ? array_filter(explode(',', $prodB['images']??'')) : [];
+                  $imgB = reset($imgsB) ? UPLOAD_URL.trim(reset($imgsB)) : '';
+                ?>
+                <?php if($imgB): ?>
+                  <img src="<?= sH($imgB) ?>" class="popular-prod-img" alt="<?= sH($prodB['name'] ?? 'Product') ?>">
+                <?php else: ?>
+                  <div class="popular-prod-img" style="display:flex;align-items:center;justify-content:center;font-size:24px">📦</div>
+                <?php endif; ?>
+
+                <div style="font-size:10.5px;font-weight:700;color:var(--brand);text-transform:uppercase;margin-bottom:2px">
+                  <?= sH($prodB['cname'] ?? 'Grade B') ?>
+                </div>
+                <div style="font-weight:700;font-size:12.5px;color:var(--n900);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px" title="<?= sH($prodB['name'] ?? '') ?>">
+                  <?= sH($prodB['name'] ?? 'Substrate B') ?>
+                </div>
+                <div style="font-size:11.5px;font-weight:700;color:#ea580c;margin-top:4px">
+                  <?= ($prodB && $prodB['price_range']) ? '₹ '.sH($prodB['price_range']) : 'Contact Rate' ?>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card Title & Description -->
+            <div style="padding:0 18px 14px">
+              <h4 style="font-size:14px;font-weight:700;color:var(--n900);margin:0 0 4px">
+                <?= sH($pc['title']) ?>
               </h4>
-              <div style="font-size:12px;color:var(--n500);margin-bottom:8px">🏭 <?= sH($rp['company']?:$rp['vname']) ?></div>
-              <div style="font-size:13.5px;font-weight:700;color:var(--brand);margin-top:auto;margin-bottom:14px">
-                <?= $rp['price_range'] ? '₹ '.sH($rp['price_range']) : 'Contact for Price' ?>
-              </div>
-              <div style="display:flex;gap:8px">
-                <a href="<?= BASE_URL ?>/public/product.php?id=<?= $rp['id'] ?>" class="btn btn-outline btn-sm" style="flex:1;text-align:center">View</a>
-                <button type="button" class="btn btn-primary btn-sm" onclick="quickAddToCompare(<?= $rp['id'] ?>)" style="flex:1">+ Compare</button>
-              </div>
+              <?php if($pc['subtitle']): ?>
+                <p style="font-size:12px;color:var(--n500);line-height:1.4;margin:0">
+                  <?= sH($pc['subtitle']) ?>
+                </p>
+              <?php endif; ?>
+            </div>
+
+            <!-- Card Footer CTA -->
+            <div class="popular-cmp-footer">
+              <button type="button" class="btn btn-full <?= $pc['is_sponsored'] ? 'btn-accent' : 'btn-outline' ?>" 
+                      onclick="loadPopularComparison(<?= $pc['id'] ?>)" 
+                      style="font-size:13px;font-weight:700;padding:8px 12px;border-radius:8px">
+                ⚡ <?= $pc['is_sponsored'] ? 'View Offers & Compare' : 'Compare Specs Side-by-Side' ?>
+              </button>
             </div>
           </div>
         <?php endforeach; ?>
       </div>
-    </div>
+    <?php else: ?>
+      <div style="background:#fff;border:1px dashed var(--n300);border-radius:12px;padding:36px;text-align:center">
+        <p style="color:var(--n500);margin:0;font-size:14px">No popular comparisons configured yet. Admin can curate popular pairings from the Admin Dashboard.</p>
+      </div>
     <?php endif; ?>
-
   </div>
-</section>
 
-<!-- Add Product picker modal -->
+  <!-- ── 4. LATEST EXPERT COMPARISONS / EDITORIAL GUIDES ── -->
+  <div style="margin-bottom:60px">
+    <div class="section-head" style="margin-bottom:20px">
+      <div class="section-label">Engineering Insights</div>
+      <h2 class="section-title-modern">Latest Expert Comparisons & Substrate Guides</h2>
+      <p class="section-subtitle-modern">Learn how to select paper grades based on bursting factor, moisture tolerance, and flute geometry.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:20px">
+      <!-- Guide 1 -->
+      <div style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
+        <div style="height:140px;background:linear-gradient(135deg,#94a3b8 0%,#64748b 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
+          📦
+        </div>
+        <div style="padding:16px;flex:1;display:flex;flex-direction:column">
+          <span style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;margin-bottom:4px">Packaging Technical Guide</span>
+          <h4 style="font-size:14.5px;font-weight:700;color:var(--n900);line-height:1.4;margin-bottom:8px">
+            Virgin Kraft vs Testliner: Burst Factor & Cobb Sizing Benchmark
+          </h4>
+          <p style="font-size:12.5px;color:var(--n500);line-height:1.5;margin-bottom:14px">
+            Understand when 24BF semi-chemical fluting is required over recycled testliners for high-humidity cold storage cartons.
+          </p>
+          <a href="<?= BASE_URL ?>/public/products.php?q=kraft" class="btn btn-outline btn-sm" style="margin-top:auto;text-align:center">
+            Explore Kraft Grades →
+          </a>
+        </div>
+      </div>
+
+      <!-- Guide 2 -->
+      <div style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
+        <div style="height:140px;background:linear-gradient(135deg,#64748b 0%,#475569 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
+          📑
+        </div>
+        <div style="padding:16px;flex:1;display:flex;flex-direction:column">
+          <span style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;margin-bottom:4px">Duplex & FBB</span>
+          <h4 style="font-size:14.5px;font-weight:700;color:var(--n900);line-height:1.4;margin-bottom:8px">
+            Grey Back vs White Back Duplex Board: Print Contrast & Rigidity
+          </h4>
+          <p style="font-size:12.5px;color:var(--n500);line-height:1.5;margin-bottom:14px">
+            A comprehensive guide to FMCG mono-carton substrate selection, coated whiteness (ISO 2470), and creasing performance.
+          </p>
+          <a href="<?= BASE_URL ?>/public/products.php?q=duplex" class="btn btn-outline btn-sm" style="margin-top:auto;text-align:center">
+            Explore Duplex Boards →
+          </a>
+        </div>
+      </div>
+
+      <!-- Guide 3 -->
+      <div style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
+        <div style="height:140px;background:linear-gradient(135deg,#475569 0%,#334155 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
+          🏗️
+        </div>
+        <div style="padding:16px;flex:1;display:flex;flex-direction:column">
+          <span style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;margin-bottom:4px">Corrugation Fluting</span>
+          <h4 style="font-size:14.5px;font-weight:700;color:var(--n900);line-height:1.4;margin-bottom:8px">
+            Single Wall vs Double Wall Boxes: Stacking Load & ECT Benchmarks
+          </h4>
+          <p style="font-size:12.5px;color:var(--n500);line-height:1.5;margin-bottom:14px">
+            Calculate box compression test (BCT) values based on flute geometry (B-Flute vs C-Flute vs BC-Flute combinations).
+          </p>
+          <a href="<?= BASE_URL ?>/public/products.php?q=flute" class="btn btn-outline btn-sm" style="margin-top:auto;text-align:center">
+            Explore Fluting Mediums →
+          </a>
+        </div>
+      </div>
+
+      <!-- Guide 4 -->
+      <div style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
+        <div style="height:140px;background:linear-gradient(135deg,#334155 0%,#1e293b 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:40px">
+          🧪
+        </div>
+        <div style="padding:16px;flex:1;display:flex;flex-direction:column">
+          <span style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;margin-bottom:4px">Quality & Lab Testing</span>
+          <h4 style="font-size:14.5px;font-weight:700;color:var(--n900);line-height:1.4;margin-bottom:8px">
+            Decoding Technical Data Sheets (TDS): Key Metrics Every Buyer Needs
+          </h4>
+          <p style="font-size:12.5px;color:var(--n500);line-height:1.5;margin-bottom:14px">
+            How to verify TAPPI and ISO lab test certificates before placing bulk paper container orders with certified mills.
+          </p>
+          <a href="<?= BASE_URL ?>/public/products.php" class="btn btn-outline btn-sm" style="margin-top:auto;text-align:center">
+            Browse TDS Catalog →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. POPULAR PAPER & PACKAGING GRADES IN 2026 (Tabbed Showcase) ── -->
+  <div style="margin-bottom:60px">
+    <div class="section-head" style="margin-bottom:16px">
+      <div class="section-label">Catalogue Directory</div>
+      <h2 class="section-title-modern">Popular Paper & Board Grades in 2026</h2>
+      <p class="section-subtitle-modern">Browse high-demand paper grades and compare them with top alternatives in one click.</p>
+    </div>
+
+    <!-- Category Filter Tabs -->
+    <div class="showcase-tabs">
+      <button type="button" class="showcase-tab-btn active" onclick="filterShowcaseCategory('all', this)">All Categories</button>
+      <?php foreach($tabCategories as $tCat): ?>
+        <button type="button" class="showcase-tab-btn" onclick="filterShowcaseCategory(<?= $tCat['id'] ?>, this)">
+          <?= sH($tCat['name']) ?> (<?= $tCat['product_count'] ?>)
+        </button>
+      <?php endforeach; ?>
+    </div>
+
+    <!-- Product Showcase Grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(250px, 1fr));gap:20px" id="showcase-product-grid">
+      <?php foreach($tabProducts as $tp): 
+          $tpImgs = array_filter(explode(',',$tp['images']??''));
+          $tpImg = reset($tpImgs) ? UPLOAD_URL.trim(reset($tpImgs)) : '';
+      ?>
+        <div class="product-card showcase-item" data-cat-id="<?= $tp['category_id'] ?>" style="background:#fff;border-radius:12px;border:1px solid var(--n200);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column">
+          <div style="position:relative;height:160px;background:var(--n50);overflow:hidden">
+            <?php if($tpImg): ?>
+              <img src="<?= sH($tpImg) ?>" alt="<?= sH($tp['name']) ?>" style="width:100%;height:100%;object-fit:cover">
+            <?php else: ?>
+              <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px">📦</div>
+            <?php endif; ?>
+            <span class="badge" style="position:absolute;top:10px;left:10px;background:rgba(15,23,42,0.85);color:#fff;font-size:11px">
+              <?= sH($tp['cname']) ?>
+            </span>
+          </div>
+          
+          <div style="padding:16px;flex:1;display:flex;flex-direction:column">
+            <h4 style="font-size:14px;font-weight:700;color:var(--n900);line-height:1.35;margin-bottom:4px;min-height:38px">
+              <a href="<?= BASE_URL ?>/public/product.php?id=<?= $tp['id'] ?>" style="color:inherit"><?= sH($tp['name']) ?></a>
+            </h4>
+            <div style="font-size:12px;color:var(--n500);margin-bottom:8px">
+              🏭 <?= sH($tp['company'] ?: $tp['vname']) ?>
+            </div>
+            
+            <div style="font-size:13.5px;font-weight:700;color:#ea580c;margin-bottom:12px">
+              <?= $tp['price_range'] ? '₹ '.sH($tp['price_range']) : 'Contact for Rate' ?>
+            </div>
+
+            <!-- Quick Compare Alternatives -->
+            <div style="margin-top:auto;border-top:1px solid #f1f5f9;padding-top:10px">
+              <div style="font-size:11px;font-weight:600;color:var(--n400);margin-bottom:6px">Quick Compare:</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+                <button type="button" class="quick-cmp-chip" onclick="quickAddToCompare(<?= $tp['id'] ?>)">+ Compare Grade</button>
+                <a href="<?= BASE_URL ?>/public/product.php?id=<?= $tp['id'] ?>" class="quick-cmp-chip" style="color:var(--n700);background:#f1f5f9;border-color:#e2e8f0">View Details</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+
+  <!-- ── 6. TECHNICAL SPECIFICATION GLOSSARY ── -->
+  <div style="margin-bottom:60px">
+    <div class="section-head" style="margin-bottom:20px">
+      <div class="section-label">Engineering Reference</div>
+      <h2 class="section-title-modern">Paper & Packaging Specification Guide</h2>
+      <p class="section-subtitle-modern">Understand what technical test parameters mean for your packaging strength and converting efficiency.</p>
+    </div>
+
+    <div class="glossary-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:20px">
+      <div style="background:#fff;padding:20px;border-radius:12px;border:1px solid var(--n200);box-shadow:var(--shadow-sm)">
+        <div style="font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="background:var(--n100);width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px">⚖️</span>
+          Burst Factor (BF) & Index
+        </div>
+        <p style="font-size:13px;color:var(--n600);line-height:1.55;margin:0">Measures the substrate's hydrostatic pressure resistance before rupture. Essential for corrugation box stacking strength and puncture protection during transit.</p>
+      </div>
+
+      <div style="background:#fff;padding:20px;border-radius:12px;border:1px solid var(--n200);box-shadow:var(--shadow-sm)">
+        <div style="font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="background:var(--n100);width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px">💧</span>
+          Cobb 60 Value (g/m²)
+        </div>
+        <p style="font-size:13px;color:var(--n600);line-height:1.55;margin:0">Quantifies the amount of water absorbed by 1 m² of paper surface in 60 seconds. Lower Cobb values indicate superior water repellency and sizing quality.</p>
+      </div>
+
+      <div style="background:#fff;padding:20px;border-radius:12px;border:1px solid var(--n200);box-shadow:var(--shadow-sm)">
+        <div style="font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="background:var(--n100);width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px">📏</span>
+          GSM & Caliper (Microns)
+        </div>
+        <p style="font-size:13px;color:var(--n600);line-height:1.55;margin:0">GSM indicates basis weight in grams per square meter. Caliper measures single-sheet thickness in microns. High bulk provides rigidity at lower grammages.</p>
+      </div>
+
+      <div style="background:#fff;padding:20px;border-radius:12px;border:1px solid var(--n200);box-shadow:var(--shadow-sm)">
+        <div style="font-size:15px;font-weight:700;color:var(--brand);display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="background:var(--n100);width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px">✨</span>
+          Brightness & Opacity (%)
+        </div>
+        <p style="font-size:13px;color:var(--n600);line-height:1.55;margin:0">Reflectance of blue light (ISO 2470) determines print contrast and vibrancy. High opacity prevents show-through in duplex and multi-color offset printing.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ADD PRODUCT PICKER MODAL (Category / Vendor Tabs)
+     ═══════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="add-product-modal">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="max-width:500px">
     <div class="modal-header">
-      <h3 style="font-size:17px;font-weight:700">+ Add Product to Compare</h3>
+      <h3 style="font-size:17px;font-weight:700">+ Select Product to Compare</h3>
       <button class="modal-close" onclick="closeAddProductPicker()">✕</button>
     </div>
     <div class="modal-body">
@@ -483,7 +1164,7 @@ $industries = $pdo->query(
                 style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2.5px solid transparent;font-weight:700;font-size:13.5px;color:var(--n400);cursor:pointer">🏭 By Vendor / Mill</button>
       </div>
 
-      <!-- ── Tab 1: Category-first (industry → category → type → product) ── -->
+      <!-- Tab 1: Category-first -->
       <div id="ap-tab-category">
         <div class="form-group">
           <label class="form-label">Industry</label>
@@ -514,7 +1195,7 @@ $industries = $pdo->query(
         </div>
       </div>
 
-      <!-- ── Tab 2: Vendor-first (vendor/mill → industry → category → type → product) ── -->
+      <!-- Tab 2: Vendor-first -->
       <div id="ap-tab-vendor" style="display:none">
         <div class="form-group" style="position:relative">
           <label class="form-label">Vendor / Mill</label>
@@ -557,7 +1238,9 @@ $industries = $pdo->query(
   </div>
 </div>
 
-<!-- Single Enquiry Modal -->
+<!-- ═══════════════════════════════════════════════════════
+     SINGLE ENQUIRY MODAL
+     ═══════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="enquiry-modal">
   <div class="modal">
     <div class="modal-header">
@@ -592,7 +1275,9 @@ $industries = $pdo->query(
   </div>
 </div>
 
-<!-- Consolidated Multi-Vendor Modal -->
+<!-- ═══════════════════════════════════════════════════════
+     CONSOLIDATED MULTI-VENDOR MODAL
+     ═══════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="multi-rfq-modal">
   <div class="modal" style="max-width:540px">
     <div class="modal-header">
@@ -638,6 +1323,62 @@ $industries = $pdo->query(
 const comparedProductsList = <?= json_encode(array_map(function($p){
     return ['id' => (int)$p['id'], 'vendor_id' => (int)$p['vendor_id'], 'name' => $p['name']];
 }, $products)) ?>;
+
+// Scroll to table when Compare Now is clicked
+function scrollToComparisonTable(){
+  const tbl = document.getElementById('active-comparison-table-section');
+  if (tbl) {
+    tbl.scrollIntoView({ behavior: 'smooth' });
+  } else {
+    openAddProductPicker();
+  }
+}
+
+// Expandable Overview Toggle
+function toggleOverviewMore(btn){
+  const more = document.getElementById('cmp-overview-more');
+  if (more.style.display === 'none') {
+    more.style.display = 'block';
+    btn.textContent = 'Read Less ▲';
+  } else {
+    more.style.display = 'none';
+    btn.textContent = 'Read More ▼';
+  }
+}
+
+// Showcase Category Tabs
+function filterShowcaseCategory(catId, btn){
+  document.querySelectorAll('.showcase-tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const items = document.querySelectorAll('.showcase-item');
+  items.forEach(item => {
+    if (catId === 'all' || item.getAttribute('data-cat-id') == catId) {
+      item.style.display = 'flex';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+// ── Load Popular Comparison (Admin Predefined Matchup) ──
+function loadPopularComparison(popId){
+  fetch(BASE + '/public/ajax/compare.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'action=load_popular&popular_id=' + encodeURIComponent(popId)
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        window.location.href = BASE + '/public/compare.php#active-comparison-table-section';
+        window.location.reload();
+      } else {
+        alert(d.msg || 'Could not load this popular comparison.');
+      }
+    })
+    .catch(() => alert('Something went wrong loading this comparison.'));
+}
 
 // Differences highlighting filter
 function toggleDiffHighlights(active){
@@ -706,6 +1447,7 @@ function clearComparePage(){
     .catch(() => alert('Something went wrong. Please try again.'));
 }
 
+// ── Enquiry Modals ──
 function openEnquiryModal(pid,vid,name){
   document.getElementById('enq-product-id').value=pid;
   document.getElementById('enq-vendor-id').value=vid;
@@ -747,7 +1489,6 @@ function submitEnquiry(e){
   });
 }
 
-// Multi Vendor Modal
 function openMultiVendorModal(){
   document.getElementById('multi-enq-success').style.display='none';
   document.getElementById('multi-enq-error').style.display='none';
@@ -768,7 +1509,6 @@ function submitMultiEnquiry(e){
 
   const baseFormData = new FormData(e.target);
   
-  // Submit RFQ to each mill in parallel
   const requests = comparedProductsList.map(p => {
     const fd = new FormData();
     for (let pair of baseFormData.entries()) {
@@ -776,30 +1516,32 @@ function submitMultiEnquiry(e){
     }
     fd.set('product_id', p.id);
     fd.set('vendor_id', p.vendor_id);
-    return fetch(BASE + '/public/ajax/enquiry.php', { method: 'POST', body: fd }).then(r => r.json());
+    return fetch(BASE + '/public/ajax/enquiry.php', { method: 'POST', body: fd })
+      .then(r => r.json());
   });
 
   Promise.all(requests)
     .then(results => {
-      const allSuccess = results.every(r => r.ok);
-      if (allSuccess) {
-        document.getElementById('multi-enq-success').textContent = 'Multi-Mill RFQ successfully dispatched to all ' + results.length + ' manufacturers! Mills will contact you with quotes.';
+      const allOk = results.every(r => r.ok);
+      if (allOk) {
+        document.getElementById('multi-enq-success').textContent = `✅ Successfully sent RFQ to all ${comparedProductsList.length} manufacturers!`;
         document.getElementById('multi-enq-success').style.display = 'flex';
         document.getElementById('multi-enq-form').style.display = 'none';
       } else {
-        btn.textContent = 'Send RFQ';
+        document.getElementById('multi-enq-error').textContent = 'Some enquiries could not be sent. Please check your details and try again.';
+        document.getElementById('multi-enq-error').style.display = 'flex';
+        btn.textContent = 'Send RFQ to All <?= count($products) ?> Mills';
         btn.disabled = false;
-        alert('Some enquiries could not be sent. Please review and try again.');
       }
     })
     .catch(() => {
-      btn.textContent = 'Send RFQ';
+      btn.textContent = 'Send RFQ to All <?= count($products) ?> Mills';
       btn.disabled = false;
-      alert('Failed to dispatch enquiries. Please try again.');
+      alert('Failed to send multi-vendor enquiry. Please try again.');
     });
 }
 
-// ── Add Product picker: industry → category → product type → product ──
+// ── Add Product Picker Dropdowns Logic ──
 function openAddProductPicker(){
   apSwitchTab('category');
   document.getElementById('ap-industry').value = '';
@@ -823,11 +1565,13 @@ document.getElementById('add-product-modal').addEventListener('click',function(e
 
 function apResetSelect(id, placeholder){
   const el = document.getElementById(id);
+  if (!el) return;
   el.innerHTML = '<option value="">'+placeholder+'</option>';
   el.disabled = true;
 }
 function apShowError(msg){
   const e = document.getElementById('ap-error');
+  if (!e) return;
   e.textContent = msg;
   e.style.display = msg ? 'flex' : 'none';
 }
@@ -970,7 +1714,8 @@ function avClearVendor(){
 }
 document.addEventListener('click', function(e){
   if (!e.target.closest('#av-vendor-search') && !e.target.closest('#av-vendor-results')) {
-    document.getElementById('av-vendor-results').style.display = 'none';
+    const res = document.getElementById('av-vendor-results');
+    if (res) res.style.display = 'none';
   }
 });
 

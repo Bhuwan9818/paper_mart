@@ -55,6 +55,56 @@ if ($action==='list') {
 } elseif ($action==='clear') {
     try{ $pdo->prepare("DELETE FROM compare_sessions WHERE session_key=?")->execute([$key]); }catch(Exception $e){}
     echo json_encode(['ok'=>true,'items'=>[]]);
+} elseif ($action==='load_popular') {
+    $popId = (int)($_POST['popular_id'] ?? 0);
+    if (!$popId) { echo json_encode(['ok'=>false,'msg'=>'Invalid comparison']); exit; }
+    try {
+        $stmt = $pdo->prepare("SELECT product_ids FROM popular_comparisons WHERE id=? AND status='active'");
+        $stmt->execute([$popId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { echo json_encode(['ok'=>false,'msg'=>'Comparison not found or inactive']); exit; }
+
+        $pids = array_filter(array_map('intval', explode(',', $row['product_ids'])));
+        if (empty($pids)) { echo json_encode(['ok'=>false,'msg'=>'No products in this comparison']); exit; }
+
+        // Clear current session
+        $pdo->prepare("DELETE FROM compare_sessions WHERE session_key=?")->execute([$key]);
+
+        // Insert new products
+        $ins = $pdo->prepare("INSERT IGNORE INTO compare_sessions (session_key, product_id) VALUES (?, ?)");
+        foreach ($pids as $pid) {
+            $ins->execute([$key, $pid]);
+        }
+
+        // Increment view count
+        $pdo->prepare("UPDATE popular_comparisons SET views_count = views_count + 1 WHERE id=?")->execute([$popId]);
+
+        echo json_encode(['ok'=>true, 'items'=>getItems($pdo,$key)]);
+    } catch(Exception $e) {
+        echo json_encode(['ok'=>false, 'msg'=>'Error: '.$e->getMessage()]);
+    }
+} elseif ($action==='set_multiple') {
+    $pids = $_POST['product_ids'] ?? [];
+    if (!is_array($pids)) {
+        $pids = explode(',', (string)$pids);
+    }
+    $pids = array_filter(array_map('intval', $pids));
+    $pids = array_slice($pids, 0, 4);
+
+    if (count($pids) < 1) { echo json_encode(['ok'=>false,'msg'=>'No products selected']); exit; }
+
+    try {
+        // Clear current session
+        $pdo->prepare("DELETE FROM compare_sessions WHERE session_key=?")->execute([$key]);
+
+        $ins = $pdo->prepare("INSERT IGNORE INTO compare_sessions (session_key, product_id) VALUES (?, ?)");
+        foreach ($pids as $pid) {
+            $ins->execute([$key, $pid]);
+        }
+        echo json_encode(['ok'=>true, 'items'=>getItems($pdo,$key)]);
+    } catch(Exception $e) {
+        echo json_encode(['ok'=>false, 'msg'=>'Error: '.$e->getMessage()]);
+    }
 } else {
     echo json_encode(['ok'=>false]);
 }
